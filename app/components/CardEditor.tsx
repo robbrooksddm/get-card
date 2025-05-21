@@ -214,9 +214,28 @@ const handleSwap = (url: string) => {
      onUndo   ={undo}
      onRedo   ={redo}
      onSave   ={handleSave}
-     mode     ={mode}
-     saving   ={saving}
+      mode     ={mode}
+      saving   ={saving}
 />
+
+        {cropping[activeIdx] && (
+          <div className="absolute top-2 inset-x-0 flex justify-center z-30 pointer-events-none">
+            <div className="flex gap-2 pointer-events-auto">
+              <button
+                onClick={() => canvasMap[activeIdx]?.commitCrop?.()}
+                className="px-3 py-1 rounded bg-green-600 text-white"
+              >
+                ✔ Done
+              </button>
+              <button
+                onClick={() => canvasMap[activeIdx]?.cancelCrop?.()}
+                className="px-3 py-1 rounded bg-gray-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* tabs */}
         <nav className="flex justify-center gap-8 py-3 text-sm font-medium">

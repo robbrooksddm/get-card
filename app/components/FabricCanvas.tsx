@@ -331,21 +331,6 @@ fc.add(cropMask)
 cropMask.sendToBack()
 cropMaskRef.current = cropMask
 
-const patchCropFn = (name: 'commitCrop' | 'cancelCrop') => {
-  const anyFc = fc as any
-  if (typeof anyFc[name] === 'function') {
-    const orig = anyFc[name].bind(fc)
-    anyFc[name] = (...args: any[]) => {
-      cropMask.visible = false
-      fc.requestRenderAll()
-      onCroppingChange?.(false)
-      return orig(...args)
-    }
-  }
-}
-
-patchCropFn('commitCrop')
-patchCropFn('cancelCrop')
 fc.setViewportTransform([SCALE, 0, 0, SCALE, 0, 0])
 fc.setWidth(PREVIEW_W)
 fc.setHeight(PREVIEW_H)
@@ -374,12 +359,21 @@ const startCrop = (img: fabric.Image) => {
   const w = img.getScaledWidth()
   const h = img.getScaledHeight()
   const rect = new fabric.Rect({
-    left: 0, top: 0, width: w, height: h,
-    fill: 'rgba(0,0,0,0.03)', stroke: SEL_COLOR,
-    strokeDashArray: dash(4), strokeUniform: true,
-    cornerColor: SEL_COLOR, lockRotation: true,
+    left: 0,
+    top: 0,
+    width: w,
+    height: h,
+    fill: 'rgba(0,0,0,0.03)',
+    stroke: SEL_COLOR,
+    strokeDashArray: dash(4),
+    strokeUniform: true,
+    cornerColor: '#ffffff',
+    cornerStrokeColor: SEL_COLOR,
+    transparentCorners: false,
   })
-  rect.setControlsVisibility({ mtr:false })
+  rect.setControlsVisibility({ mtr: true })
+  rect.controls.mtr.y = 0.5
+  rect.controls.mtr.offsetY = 20 / SCALE
   cropRectRef.current = rect
   const frame = new fabric.Rect({
     left: 0, top: 0, width: w, height: h,
@@ -392,20 +386,33 @@ const startCrop = (img: fabric.Image) => {
   const v2 = new fabric.Line([w*2/3,0,w*2/3,h], gp)
   const h1 = new fabric.Line([0,h/3,w,h/3], gp)
   const h2 = new fabric.Line([0,h*2/3,w,h*2/3], gp)
-  const grp = new fabric.Group([frame,rect,v1,v2,h1,h2],{
-    left: img.left, top: img.top, originX:'left', originY:'top'
+  const grp = new fabric.Group([frame,rect,v1,v2,h1,h2], {
+    left: img.left,
+    top: img.top,
+    originX: 'left',
+    originY: 'top',
+    borderColor: SEL_COLOR,
+    cornerColor: '#ffffff',
+    cornerStrokeColor: SEL_COLOR,
+    transparentCorners: false,
+    lockScalingFlip: true,
   })
+  grp.setControlsVisibility({ mtr: true })
+  grp.controls.mtr.y = 0.5
+  grp.controls.mtr.offsetY = 20 / SCALE
   ;(grp as any)._cropGroup = true
   cropGroupRef.current = grp
   fc.add(grp)
   fc.setActiveObject(grp)
   fc.requestRenderAll()
 
-  const sync = () => {
+  const sync = (e?: fabric.IEvent) => {
     const g  = cropGroupRef.current
     const pic = cropImgRef.current
     const st  = cropStartRef.current
     if (!g || !pic || !st) return
+
+    const keepRatio = !!(e && (e.e as any)?.shiftKey)
 
     const el = pic.getElement() as HTMLImageElement
     const origW = el.naturalWidth || pic.width!
@@ -413,6 +420,12 @@ const startCrop = (img: fabric.Image) => {
 
     let cropW = (g.width! * g.scaleX!) / st.scaleX
     let cropH = (g.height! * g.scaleY!) / st.scaleY
+
+    if (keepRatio) {
+      const r = st.cropW / st.cropH
+      if (cropW / cropH > r) cropH = cropW / r
+      else cropW = cropH * r
+    }
 
     let cropX = (g.left! - st.left) / st.scaleX + st.cropX
     let cropY = (g.top!  - st.top ) / st.scaleY + st.cropY
@@ -439,8 +452,6 @@ const startCrop = (img: fabric.Image) => {
     })
     pic.setCoords()
 
-    g.set({
-    })
     g.setCoords()
 
     const mask = cropMaskRef.current
@@ -761,6 +772,8 @@ document.addEventListener('start-crop', cropListener)
 
   /* ── 6 ▸ Expose canvas & tidy up ──────────────────────────── */
   fcRef.current = fc; onReady(fc)
+  ;(fc as any).commitCrop = commitCrop
+  ;(fc as any).cancelCrop = cancelCrop
 
   return () => {
     window.removeEventListener('keydown', onKey)
