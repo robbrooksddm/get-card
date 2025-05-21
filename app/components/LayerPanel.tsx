@@ -15,7 +15,7 @@ import { CSS } from '@dnd-kit/utilities'
 
 /* single row (draggable) ------------------------------------------ */
 function Row ({ id, idx }: { id: string; idx: number }) {
-  const layer   = useEditor(s => s.pages[s.activePage]?.layers[idx])
+  const layer   = useEditor(s => s.pages[s.activePage]?.layers[idx]) as any
   const remove  = useEditor(s => s.deleteLayer) // not .removeLayer
 
   const {
@@ -29,6 +29,9 @@ function Row ({ id, idx }: { id: string; idx: number }) {
     <li ref={setNodeRef} style={style}
         className="flex items-center bg-gray-100 rounded mb-1 p-2 text-xs">
       <span {...listeners} {...attributes} className="cursor-grab mr-2">☰</span>
+      {layer.thumbUrl && (
+        <img src={layer.thumbUrl} alt="" className="w-8 h-8 mr-2 object-contain border" />
+      )}
       <span className="flex-1 truncate">
         {layer.type === 'text'
           ? (layer.text ?? 'text').slice(0, 20)
@@ -46,10 +49,10 @@ export default function LayerPanel () {
   const addImage = useEditor(s => s.addImage)
   const [open, setOpen] = useState(true)
 
+  const sensors   = useSensors(useSensor(PointerSensor))
+
   if (!pages[activePage]) return null
   const ids = pages[activePage].layers.map((_, i) => i.toString())
-
-  const sensors   = useSensors(useSensor(PointerSensor))
   const onDragEnd = (e: DragEndEvent) => {
     if (e.over && e.active.id !== e.over.id)
       reorder(+e.active.id, +e.over.id)

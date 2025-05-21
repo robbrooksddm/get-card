@@ -11,6 +11,7 @@
 import { useEffect, useRef } from 'react'
 import { fabric }            from 'fabric'
 import { useEditor }         from './EditorStore'
+import type { EditorLayer }  from './EditorStore'
 import { fromSanity }        from '@/app/library/layerAdapters'
 
 /* ---------- size helpers ---------------------------------------- */
@@ -24,6 +25,7 @@ const PAGE_H    = Math.round(mm(TRIM_H_MM + BLEED_MM * 2))
 const PREVIEW_W = 420
 const PREVIEW_H = Math.round(PAGE_H * PREVIEW_W / PAGE_W)
 const SCALE     = PREVIEW_W / PAGE_W
+const THUMB      = 48
 
 /* ---------- Fabric tweak: bigger handles ------------------------ */
 const SEL_COLOR = '#8b5cf6'                      // same purple you use
@@ -167,10 +169,20 @@ const getSrcUrl = (raw: Layer): string | undefined => {
     return undefined
   }                   // can’t resolve yet
 
+const objToThumb = (o: fabric.Object): string | undefined => {
+  try {
+    const rect = o.getBoundingRect(true, true)
+    const scale = THUMB / Math.max(rect.width, rect.height)
+    return o.toDataURL({ multiplier: scale })
+  } catch {
+    return undefined
+  }
+}
+
 /* ── 1 ▸ TWO NEW TINY HELPERS ─────────────────────────────────── */
 
 /** Convert a Fabric object → our Layer shape */
-const objToLayer = (o: fabric.Object): Layer => {
+const objToLayer = (o: fabric.Object): EditorLayer => {
   if ((o as any).type === 'textbox') {
     const t = o as fabric.Textbox
     return {
@@ -190,6 +202,7 @@ const objToLayer = (o: fabric.Object): Layer => {
       opacity   : t.opacity,
       scaleX    : t.scaleX,
       scaleY    : t.scaleY,
+      thumbUrl  : objToThumb(o),
     }
   }
   const i = o as fabric.Image
@@ -203,6 +216,7 @@ const objToLayer = (o: fabric.Object): Layer => {
     opacity: i.opacity,
     scaleX : i.scaleX,
     scaleY : i.scaleY,
+    thumbUrl: objToThumb(o),
   }
 }
 
@@ -229,7 +243,7 @@ const syncLayersFromCanvas = (fc: fabric.Canvas, pageIdx: number) => {
   objs.forEach((o, i) => ((o as any).layerIdx = i));
 
   /* stash in Zustand + history */
-  const layers = objs.map(objToLayer);
+  const layers = objs.map(objToLayer) as EditorLayer[];
   const store  = useEditor.getState();
   store.setPageLayers(pageIdx, layers);
   store.pushHistory();

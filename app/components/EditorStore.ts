@@ -14,6 +14,8 @@ export type EditorLayer = Layer & {
   srcUrl?: string
   /** `true` between upload POST → success                           */
   uploading?: boolean
+  /** small preview of the layer for the sidebar                     */
+  thumbUrl?: string
 }
 
 /* ---------- Selfie drawer state (unchanged) ----------------------- */
