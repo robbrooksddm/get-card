@@ -1,0 +1,19 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+      /* Jest-specific tweaks ---- */
+      "jsx": "react-jsx",        // <--  compile JSX away
+      "module": "commonjs",      // <--  Jest expects CJS
+      "types": ["jest", "node"], // Jest globals & Node shims
+      "noEmit": false,           // ts-jest rewrites this anyway
+      "isolatedModules": true
+    },
+  
+    /* keep the scope small */
+    "include": [
+      "app/**/*",
+      "lib/**/*",
+      "**/*.test.ts",
+      "**/*.test.tsx"
+    ]
+  }

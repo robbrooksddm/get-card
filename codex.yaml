@@ -1,0 +1,7 @@
+setup:
+  - corepack enable
+  - pnpm config set store-dir .pnpm-store
+  - pnpm install --offline --frozen-lockfile --ignore-scripts
+
+test:
+  - pnpm test --runInBand

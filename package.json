@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "next lint",
     "purge:assets": "tsx ./scripts/purge-assets.ts",
-    "purge:once": "tsx scripts/purgeTempAssets.ts"
+    "purge:once": "tsx scripts/purgeTempAssets.ts",
+    "test": "jest --passWithNoTests --runInBand"
   },
   "dependencies": {
     "@headlessui/react": "2.2.2",
@@ -35,10 +36,15 @@
     "zustand": "^5.0.3"
   },
   "overrides": {
+    "canvas": "npm:identity-obj-proxy@3.0.0",
     "styled-components": "^6.1.17"
   },
   "devDependencies": {
+    "@sanity/icons": "^3.7.0",
+    "@sanity/ui": "^2.15.18",
     "@tailwindcss/postcss": "^4.1.4",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^14.2.1",
     "@types/fabric": "^5.3.10",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -46,12 +52,17 @@
     "@typescript-eslint/eslint-plugin": "^8.32.1",
     "@typescript-eslint/parser": "^8.32.1",
     "autoprefixer": "^10.4.21",
+    "canvas": "npm:identity-obj-proxy@^3.0.0",
     "concurrently": "^8.2.2",
     "dotenv": "^16.5.0",
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.3.2",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.4",
+    "ts-jest": "^29.3.4",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.4",
     "typescript": "^5"
