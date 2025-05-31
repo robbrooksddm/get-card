@@ -441,7 +441,10 @@ const startCrop = (img: fabric.Image) => {
     new fabric.Line([0,frameH*2/3, frameW,frameH*2/3], gridStroke),
   ],{
     left:frameLeft, top:frameTop, originX:'left', originY:'top',
-    selectable:false, evented:false,
+    selectable:true, evented:true,
+    lockMovementX:true, lockMovementY:true,
+    lockRotation:true, lockScalingFlip:true,
+    hasBorders:false,
   });
   (frame as any)._cropGroup = true
   cropGroupRef.current = frame;
@@ -465,10 +468,25 @@ const startCrop = (img: fabric.Image) => {
     updateMaskAround(frame);
   };
 
+  const clampFrame = () => {
+    const fx = frame.left!;
+    const fy = frame.top!;
+    const maxW = (img.left ?? 0) + img.getScaledWidth()  - fx;
+    const maxH = (img.top  ?? 0) + img.getScaledHeight() - fy;
+    const fw = Math.min(frame.width! * frame.scaleX!, maxW);
+    const fh = Math.min(frame.height! * frame.scaleY!, maxH);
+    frame.set({
+      scaleX: fw / frame.width!,
+      scaleY: fh / frame.height!,
+    }).setCoords();
+    clamp();
+  };
+
   img.set({ selectable:true, evented:true });
-  fc.setActiveObject(img);
+  fc.setActiveObject(frame);
   updateMaskAround(frame);
   img.on('moving', clamp).on('scaling', clamp);
+  frame.on('scaling', clampFrame);
 };
 
 /* ---------- cancelCrop (unchanged) ---------------------------- */
@@ -476,6 +494,7 @@ const cancelCrop = () => {
   if (!croppingRef.current) return;
   const img = cropImgRef.current, st = cropStartRef.current as CropSnap | null;
   img?.off('moving').off('scaling');
+  cropGroupRef.current?.off('scaling');
   fc.remove(cropGroupRef.current!); clearMask();
 
   if (img && st) {
@@ -499,6 +518,7 @@ const commitCrop = () => {
   const st    = cropStartRef.current as CropSnap;
 
   img.off('moving').off('scaling');
+  frame.off('scaling');
   fc.remove(frame); clearMask();
 
   const invSX = 1/(img.scaleX??1), invSY = 1/(img.scaleY??1);
@@ -557,6 +577,10 @@ fc.on('selection:created', () => {
 fc.on('object:moving',   () => { hoverHL.visible = false })
   .on('object:scaling',  () => { hoverHL.visible = false })
   .on('object:rotating', () => { hoverHL.visible = false })
+  .on('mouse:up', () => {
+    if (croppingRef.current && cropGroupRef.current)
+      fc.setActiveObject(cropGroupRef.current);
+  })
 
 /* ── 4 ▸ Hover outline (only when NOT the active object) ─── */
 fc.on('mouse:over', e => {
