@@ -7,6 +7,21 @@
 import { useEffect, useState } from 'react'
 import { fabric }              from 'fabric'
 import { getActiveTextbox }    from './FabricCanvas'
+import IconButton              from './toolbar/IconButton'
+import ToolTextOpacitySlider   from './toolbar/ToolTextOpacitySlider'
+import {
+  Type,
+  Bold,
+  Italic,
+  Underline,
+  CaseUpper,
+  CaseLower,
+  CaseSensitive,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+} from 'lucide-react'
 
 type Mode = 'staff'|'customer'
 const fonts = ['Arial','Georgia','monospace','Dingos Stamp']
@@ -65,19 +80,19 @@ export default function TextToolbar(props:Props){
 
   /* ---------------------------------------------------------------- */
   return (
-    <div className="fixed top-0 inset-x-0 z-30 flex justify-center pointer-events-none select-none">
+    <div className="fixed inset-x-0 top-2 z-30 flex justify-center pointer-events-none select-none">
 
       {/* ───────── ① MAIN TOOLBAR (staff only) ───────── */}
       {mode==='staff' && (
-        <div className="toolbar pointer-events-auto flex flex-wrap items-center gap-2
-                        border bg-white/95 backdrop-blur rounded-md shadow px-3 py-1
-                        max-w-[800px] w-[calc(100%-10rem)]">
+        <div
+          className="pointer-events-auto flex flex-wrap items-center gap-6
+                     bg-[--walty-cream]/95 backdrop-blur shadow-lg rounded-xl
+                     border border-[rgba(0,91,85,.2)] px-4 py-3
+                     max-w-[720px] w-[calc(100%-6rem)]"
+        >
 
-          {/* +Text */}
-          <button onClick={addText} className="px-3 py-1 rounded bg-blue-600 text-white
-                                               shrink-0 hover:bg-blue-700 active:bg-blue-800">
-            + Text
-          </button>
+          {/* Add text */}
+          <IconButton Icon={Type} label="Add text" caption="Text" onClick={addText} />
 
 
           {/* font family */}
@@ -104,63 +119,81 @@ export default function TextToolbar(props:Props){
                  className="disabled:opacity-40 h-8 w-8 border p-0"/>
 
           {/* B / I / U */}
-          <button disabled={!tb} onClick={()=>mutate({fontWeight:tb!.fontWeight==='bold'?'normal':'bold'})}
-                  className="toolbar-btn font-bold">B</button>
-          <button disabled={!tb} onClick={()=>mutate({fontStyle:tb!.fontStyle==='italic'?'normal':'italic'})}
-                  className="toolbar-btn italic">I</button>
-          <button disabled={!tb} onClick={()=>mutate({underline:!tb!.underline})}
-                  className="toolbar-btn underline">U</button>
+          <IconButton
+            Icon={Bold}
+            label="Bold"
+            onClick={() => mutate({ fontWeight: tb!.fontWeight === 'bold' ? 'normal' : 'bold' })}
+            active={tb?.fontWeight === 'bold'}
+            disabled={!tb}
+          />
+          <IconButton
+            Icon={Italic}
+            label="Italic"
+            onClick={() => mutate({ fontStyle: tb!.fontStyle === 'italic' ? 'normal' : 'italic' })}
+            active={tb?.fontStyle === 'italic'}
+            disabled={!tb}
+          />
+          <IconButton
+            Icon={Underline}
+            label="Underline"
+            onClick={() => mutate({ underline: !tb!.underline })}
+            active={!!tb?.underline}
+            disabled={!tb}
+          />
 
           {/* text case cycle */}
-          <button
-            disabled={!tb}
+          <IconButton
+            Icon={caseState === 'upper' ? CaseUpper : caseState === 'title' ? CaseSensitive : CaseLower}
+            label="Change case"
             onClick={() => {
-              if (!tb) return
+              if (!tb) return;
               if (caseState === 'upper') {
-                mutate({ text: tb!.text!.toUpperCase() })
-                setCaseState('title')
+                mutate({ text: tb!.text!.toUpperCase() });
+                setCaseState('title');
               } else if (caseState === 'title') {
-                mutate({ text: tb!.text!.replace(/\b\w/g, c => c.toUpperCase()) })
-                setCaseState('lower')
+                mutate({ text: tb!.text!.replace(/\b\w/g, c => c.toUpperCase()) });
+                setCaseState('lower');
               } else {
-                mutate({ text: tb!.text!.toLowerCase() })
-                setCaseState('upper')
+                mutate({ text: tb!.text!.toLowerCase() });
+                setCaseState('upper');
               }
             }}
-            className="toolbar-btn">
-            {caseState === 'upper' ? 'AA' : caseState === 'title' ? 'Aa' : 'aa'}
-          </button>
+            disabled={!tb}
+          />
 
           {/* align */}
-          <button
-            disabled={!tb}
+          <IconButton
+            Icon={
+              (tb?.textAlign ?? 'left') === 'left'
+                ? AlignLeft
+                : (tb?.textAlign ?? 'left') === 'center'
+                  ? AlignCenter
+                  : (tb?.textAlign ?? 'left') === 'right'
+                    ? AlignRight
+                    : AlignJustify
+            }
+            label="Align"
             onClick={cycleAlign}
-            className="toolbar-btn">
-            {alignSymbols[tb?.textAlign ?? 'left']}
-          </button>
+            disabled={!tb}
+          />
 
           {/* line-height */}
-          <input disabled={!tb} type="number" step={0.1} min={0.5} max={3}
-                 value={tb?.lineHeight ?? ''}
-                 onChange={e=>mutate({lineHeight:+e.target.value})}
-                 className="w-16 border p-1 rounded disabled:opacity-40"/>
+          <input
+            disabled={!tb}
+            type="number"
+            step={0.1}
+            min={0.5}
+            max={3}
+            value={tb?.lineHeight ?? ''}
+            onChange={e => mutate({ lineHeight: +e.target.value })}
+            className="w-16 border p-1 rounded disabled:opacity-40"
+          />
 
           {/* opacity */}
-          <input disabled={!tb} type="range" min={0} max={1} step={0.01}
-                 value={tb?.opacity ?? 1}
-                 onChange={e=>mutate({opacity:+e.target.value})}
-                 className="disabled:opacity-40"/>
+          <ToolTextOpacitySlider tb={tb} mutate={mutate} />
         </div>
       )}
 
     </div>
   )
-}
-
-/* inject one-off tiny CSS (only once) */
-if(typeof window!=='undefined' && !document.getElementById('toolbar-css')){
-  const shared='border px-2 py-[2px] rounded hover:bg-gray-100 disabled:opacity-40'
-  const style=document.createElement('style'); style.id='toolbar-css'
-  style.innerHTML=`.toolbar-btn{${shared}}`
-  document.head.appendChild(style)
 }
