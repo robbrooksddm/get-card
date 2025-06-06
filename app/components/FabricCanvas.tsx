@@ -500,7 +500,7 @@ const startCrop = (img: fabric.Image) => {
 
   const renderCropControls = () => {
     if (croppingRef.current && cropGroupRef.current) {
-      fc.clearContext(fc.contextTop)
+      fc.clearContext((fc as any).contextTop)
       cropGroupRef.current.drawControls((fc as any).contextTop)
       cropImgRef.current?.drawControls((fc as any).contextTop)
     }
@@ -574,14 +574,24 @@ const startCrop = (img: fabric.Image) => {
     fc.off('mouse:move', frameDrag)
     fc.off('mouse:up', frameUp)
   }
-  const imgDown   = () => fc.setActiveObject(img)
+  const imgDown   = (e?: fabric.IEvent) => {
+    fc.setActiveObject(frame)
+    dragData = {
+      x: e?.absolutePointer!.x ?? 0,
+      y: e?.absolutePointer!.y ?? 0,
+      left: img.left ?? 0,
+      top : img.top  ?? 0,
+    }
+    fc.on('mouse:move', frameDrag)
+    fc.on('mouse:up', frameUp)
+  }
   const imgUp     = () => {}
   const frameDown = (e: fabric.IEvent) => {
     const corner = (e as any).transform?.corner
     if (!corner) {
       frame.lockMovementX = true
       frame.lockMovementY = true
-      fc.setActiveObject(img)
+      fc.setActiveObject(frame)
       dragData = {
         x: e.absolutePointer!.x,
         y: e.absolutePointer!.y,
