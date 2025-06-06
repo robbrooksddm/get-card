@@ -311,6 +311,8 @@ export default function FabricCanvas ({ pageIdx, page, onReady, isCropping = fal
     imgDown   : (e: fabric.IEvent) => void
     imgUp     : (e: fabric.IEvent) => void
     frameDown : (e: fabric.IEvent) => void
+    frameDrag : (e: fabric.IEvent) => void
+    frameUp   : (e: fabric.IEvent) => void
     clamp     : () => void
     clampFrame: () => void
     renderCropControls: () => void
@@ -605,6 +607,8 @@ const startCrop = (img: fabric.Image) => {
     imgDown,
     imgUp,
     frameDown,
+    frameDrag,
+    frameUp,
     clamp,
     clampFrame,
     renderCropControls,
@@ -628,8 +632,10 @@ const cancelCrop = () => {
     frame.off('scaling', handlers.clampFrame)
          .off('mousedown', handlers.frameDown)
   }
-  fc.off('mouse:move', frameDrag)
-  fc.off('mouse:up', frameUp)
+  if (handlers) {
+    fc.off('mouse:move', handlers.frameDrag)
+    fc.off('mouse:up', handlers.frameUp)
+  }
   if (frame) {
     frame.lockMovementX = false
     frame.lockMovementY = false
@@ -669,8 +675,10 @@ const commitCrop = () => {
      .off('mouseup', handlers?.imgUp)
   frame.off('scaling', handlers?.clampFrame)
        .off('mousedown', handlers?.frameDown)
-  fc.off('mouse:move', frameDrag)
-  fc.off('mouse:up', frameUp)
+  if (handlers) {
+    fc.off('mouse:move', handlers.frameDrag)
+    fc.off('mouse:up', handlers.frameUp)
+  }
   frame.lockMovementX = false
   frame.lockMovementY = false
   if (handlers) fc.off('after:render', handlers.renderCropControls)
