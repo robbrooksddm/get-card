@@ -19,6 +19,7 @@ import TextToolbar                      from './TextToolbar'
 import ImageToolbar                     from './ImageToolbar'
 import EditorCommands                   from './EditorCommands'
 import SelfieDrawer                     from './SelfieDrawer'
+import CropDrawer                       from './CropDrawer'
 import type { TemplatePage }            from './FabricCanvas'
 
 /* ---------- helpers ------------------------------------------------ */
@@ -126,6 +127,9 @@ export default function CardEditor({
   const handleCroppingChange = (idx: number, state: boolean) =>
     setCropping(prev => { const next = [...prev] as typeof prev; next[idx] = state; return next })
 
+  const sendKey = (code: string) =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { code }))
+
   /* 5 ─ save ------------------------------------------------------ */
   const [saving, setSaving] = useState(false)
   const handleSave = async () => {
@@ -222,6 +226,11 @@ const handleSwap = (url: string) => {
         onClose={() => setDrawerOpen(false)}
         onUseSelected={handleSwap}
         placeholderId={aiPlaceholderId}   /* ← NEW prop */
+      />
+      <CropDrawer
+        open={cropping.some(Boolean)}
+        onCancel={() => sendKey('Escape')}
+        onCommit={() => sendKey('Enter')}
       />
 
       {/* sidebar */}
