@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import sharp from 'sharp'
+import { sanity } from '@/sanity/lib/client'
 
 interface Overlay extends sharp.OverlayOptions {
   /** Global opacity for the overlay; sharp's types omit this */
@@ -21,11 +22,29 @@ function esc(s: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { pages, sku } = await req.json() as { pages:any[]; sku:keyof typeof SPECS }
-    if (!Array.isArray(pages) || !SPECS[sku]) {
+    const { pages, sku, id } = await req.json() as {
+      pages: any[];
+      sku : string;
+      id  : string;
+    }
+    if (!Array.isArray(pages) || typeof sku !== 'string' || typeof id !== 'string') {
       return NextResponse.json({ error: 'bad input' }, { status: 400 })
     }
-    const spec = SPECS[sku]
+
+    const result = await sanity.fetch<{printSpec?: any}>(
+      `*[_type=="cardTemplate" && _id==$id][0]{
+         "printSpec": products[slug.current==$sku][0]->printSpec
+       }`,
+      { id, sku },
+    )
+    const fetched = result?.printSpec
+    const spec = fetched
+      ? {
+          trimW: fetched.trimWidthIn * 25.4,
+          trimH: fetched.trimHeightIn * 25.4,
+          bleed: fetched.bleedIn * 25.4,
+        }
+      : SPECS[sku as keyof typeof SPECS]
     const width  = Math.round(mm(spec.trimW + spec.bleed * 2))
     const height = Math.round(mm(spec.trimH + spec.bleed * 2))
 
