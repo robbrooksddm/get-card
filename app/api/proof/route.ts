@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import sharp from 'sharp'
+import { sanityPreview } from '@/sanity/lib/client'
 
 interface Overlay extends sharp.OverlayOptions {
   /** Global opacity for the overlay; sharp's types omit this */
@@ -8,11 +9,10 @@ interface Overlay extends sharp.OverlayOptions {
 
 export const dynamic = 'force-dynamic'
 
-const DPI = 300
-const mm = (n:number) => (n / 25.4) * DPI
-
 const SPECS = {
-  'card-7x5': { trimW: 150, trimH: 214, bleed: 3 },
+  'greeting-card-giant'  : { trimWidthIn: 9, trimHeightIn: 11.6667, bleedIn: 0.125, dpi: 300 },
+  'greeting-card-classic': { trimWidthIn: 7, trimHeightIn: 5, bleedIn: 0.125, dpi: 300 },
+  'greeting-card-mini'   : { trimWidthIn: 6, trimHeightIn: 4, bleedIn: 0.125, dpi: 300 },
 } as const
 
 function esc(s: string) {
@@ -21,13 +21,33 @@ function esc(s: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { pages, sku } = await req.json() as { pages:any[]; sku:keyof typeof SPECS }
-    if (!Array.isArray(pages) || !SPECS[sku]) {
+    const { pages, id, sku } = (await req.json()) as {
+      pages: any[]
+      id: string
+      sku?: string
+    }
+    if (!Array.isArray(pages) || typeof id !== 'string') {
       return NextResponse.json({ error: 'bad input' }, { status: 400 })
     }
-    const spec = SPECS[sku]
-    const width  = Math.round(mm(spec.trimW + spec.bleed * 2))
-    const height = Math.round(mm(spec.trimH + spec.bleed * 2))
+
+    const spec = await sanityPreview.fetch<{
+      trimWidthIn: number
+      trimHeightIn: number
+      bleedIn: number
+      dpi: number
+    } | null>(
+      `*[_type=="cardTemplate" && _id==$id][0]{ product->{ printSpec } }.product.printSpec`,
+      { id },
+    )
+    const fallback = sku && SPECS[sku]
+    const finalSpec = spec ?? fallback
+    if (!finalSpec) {
+      return NextResponse.json({ error: 'spec not found' }, { status: 404 })
+    }
+
+    const px = (inches: number) => Math.round(inches * finalSpec.dpi)
+    const width  = px(finalSpec.trimWidthIn  + finalSpec.bleedIn * 2)
+    const height = px(finalSpec.trimHeightIn + finalSpec.bleedIn * 2)
 
     const clamp = (n:number, min:number, max:number) => Math.max(min, Math.min(max, n))
     const composites: Overlay[] = []
@@ -89,7 +109,9 @@ export async function POST(req: NextRequest) {
     let img = sharp({ create: { width, height, channels: 4, background: '#ffffff' } }).composite(composites)
 
     const masterRatio = width / height
-    const targetRatio = (spec.trimW + spec.bleed * 2) / (spec.trimH + spec.bleed * 2)
+    const targetRatio =
+      (finalSpec.trimWidthIn + finalSpec.bleedIn * 2) /
+      (finalSpec.trimHeightIn + finalSpec.bleedIn * 2)
     if (targetRatio < masterRatio) {
       const cropW = Math.round(height * targetRatio)
       const offsetX = Math.floor((width - cropW) / 2)
@@ -97,8 +119,10 @@ export async function POST(req: NextRequest) {
                .extend({ left: 0, right: 0, top: 0, bottom: 0, background: '#ffffff' })
     }
 
-    const out = await img.png().toBuffer()
-    return new NextResponse(out, { headers: { 'content-type': 'image/png' } })
+    const out = await img
+      .jpeg({ quality: 95, chromaSubsampling: '4:4:4' })
+      .toBuffer()
+    return new NextResponse(out, { headers: { 'content-type': 'image/jpeg' } })
   } catch (err) {
     console.error('[proof]', err)
     return NextResponse.json({ error: 'server' }, { status: 500 })

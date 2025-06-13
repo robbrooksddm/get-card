@@ -54,6 +54,7 @@ export default function EditorWrapper({templateId, initialPages}: Props) {
 
       <CardEditor
         initialPages={initialPages}
+        templateId={templateId}
         mode="staff"
         onSave={handleSave}
       />
