@@ -8,7 +8,7 @@ type Mode = 'staff' | 'customer';
 interface Props {
   onUndo: () => void;
   onRedo: () => void;
-  onSave: () => void | Promise<void>;
+  onSave?: () => void | Promise<void>;
   onProof?: (sku: string) => void | Promise<void>;
   saving: boolean;
   mode?: Mode;
@@ -20,17 +20,19 @@ export default function EditorCommands({ onUndo, onRedo, onSave, onProof, saving
                      bg-white shadow rounded-md px-3 py-3 pointer-events-auto select-none" style={{ top: "var(--walty-header-h)" }}>
       <IconButton Icon={RotateCcw} label="Undo" onClick={onUndo} />
       <IconButton Icon={RotateCw} label="Redo" onClick={onRedo} />
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={saving}
-        className={`flex items-center gap-1 px-3 py-2 rounded font-semibold
-                    ${saving ? 'opacity-50 cursor-not-allowed'
-                              : 'text-[--walty-orange] hover:bg-[--walty-orange]/10'}`}
-      >
-        <Save className="w-5 h-5" />
-        {saving ? 'Saving…' : 'Save'}
-      </button>
+      {mode === 'staff' && onSave && (
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          className={`flex items-center gap-1 px-3 py-2 rounded font-semibold
+                      ${saving ? 'opacity-50 cursor-not-allowed'
+                                : 'text-[--walty-orange] hover:bg-[--walty-orange]/10'}`}
+        >
+          <Save className="w-5 h-5" />
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      )}
       {mode === 'staff' && onProof && (
         <>
           {[
