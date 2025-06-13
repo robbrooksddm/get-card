@@ -43,6 +43,14 @@ export default defineType({
       validation: (Rule) => Rule.required().positive(),
     }),
 
+    /* how the product should be printed */
+    defineField({
+      name: 'printSpec',
+      title: 'Print specification',
+      type: 'printSpec',
+      validation: Rule => Rule.required(),
+    }),
+
     /* print specs – the editor can read these if you ever show guides
        per product */
     defineField({name:'trimWidthMm',  type:'number', title:'Trim width (mm)',  validation:(R)=>R.required()}),

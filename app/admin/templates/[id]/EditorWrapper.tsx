@@ -15,9 +15,10 @@ import type {TemplatePage} from '@/app/components/FabricCanvas'
 interface Props {
   templateId   : string
   initialPages : TemplatePage[]
+  printSpec?: any
 }
 
-export default function EditorWrapper({templateId, initialPages}: Props) {
+export default function EditorWrapper({templateId, initialPages, printSpec}: Props) {
   const router          = useRouter()
   const [error, setErr] = useState<string | null>(null)
 
@@ -54,6 +55,7 @@ export default function EditorWrapper({templateId, initialPages}: Props) {
 
       <CardEditor
         initialPages={initialPages}
+        printSpec={printSpec}
         mode="staff"
         onSave={handleSave}
       />

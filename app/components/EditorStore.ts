@@ -4,15 +4,7 @@
  *********************************************************************/
 import { create } from 'zustand'
 import type { Layer, TemplatePage } from './FabricCanvas'
-
-/* ---------- shared page constants (matches FabricCanvas) --------- */
-const DPI       = 300
-const mm        = (n: number) => (n / 25.4) * DPI
-const TRIM_W_MM = 150
-const TRIM_H_MM = 214
-const BLEED_MM  = 3
-const PAGE_W    = Math.round(mm(TRIM_W_MM + BLEED_MM * 2))
-const PAGE_H    = Math.round(mm(TRIM_H_MM + BLEED_MM * 2))
+import { mm, pageWidth, pageHeight } from '@/lib/printSpec'
 
 /* ---------- helpers ------------------------------------------------ */
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v))
@@ -149,10 +141,10 @@ export const useEditor = create<EditorState>((set, get) => ({
       x    : 100,
       y    : 100,
       width: 200,
-      leftPct:   (100 / PAGE_W) * 100,
-      topPct:    (100 / PAGE_H) * 100,
-      widthPct:  (200 / PAGE_W) * 100,
-      heightPct: (0 / PAGE_H) * 100,
+      leftPct:   (100 / pageWidth()) * 100,
+      topPct:    (100 / pageHeight()) * 100,
+      widthPct:  (200 / pageWidth()) * 100,
+      heightPct: (0 / pageHeight()) * 100,
     })
 
     set({ pages: nextPages })
@@ -176,10 +168,10 @@ export const useEditor = create<EditorState>((set, get) => ({
       x        : 100,
       y        : 100,
       width    : 300,
-      leftPct:   (100 / PAGE_W) * 100,
-      topPct:    (100 / PAGE_H) * 100,
-      widthPct:  (300 / PAGE_W) * 100,
-      heightPct: (300 / PAGE_H) * 100,
+      leftPct:   (100 / pageWidth()) * 100,
+      topPct:    (100 / pageHeight()) * 100,
+      widthPct:  (300 / pageWidth()) * 100,
+      heightPct: (300 / pageHeight()) * 100,
       srcUrl   : blobUrl,
       uploading: true,
     } as EditorLayer)

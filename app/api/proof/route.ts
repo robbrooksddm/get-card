@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import sharp from 'sharp'
+import { sanity } from '@/sanity/lib/client'
+import type { PrintSpec } from '@/sanity/lib/types'
 
 interface Overlay extends sharp.OverlayOptions {
   /** Global opacity for the overlay; sharp's types omit this */
@@ -8,12 +10,7 @@ interface Overlay extends sharp.OverlayOptions {
 
 export const dynamic = 'force-dynamic'
 
-const DPI = 300
-const mm = (n:number) => (n / 25.4) * DPI
-
-const SPECS = {
-  'card-7x5': { trimW: 150, trimH: 214, bleed: 3 },
-} as const
+function mm(n:number, dpi:number) { return (n / 25.4) * dpi }
 
 function esc(s: string) {
   return s.replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]!))
@@ -21,13 +18,20 @@ function esc(s: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { pages, sku } = await req.json() as { pages:any[]; sku:keyof typeof SPECS }
-    if (!Array.isArray(pages) || !SPECS[sku]) {
+    const { pages, sku } = await req.json() as { pages:any[]; sku:string }
+    if (!Array.isArray(pages) || !sku) {
       return NextResponse.json({ error: 'bad input' }, { status: 400 })
     }
-    const spec = SPECS[sku]
-    const width  = Math.round(mm(spec.trimW + spec.bleed * 2))
-    const height = Math.round(mm(spec.trimH + spec.bleed * 2))
+    const q = '*[_type=="cardProduct" && slug.current==$s][0]{printSpec}'
+    console.log('[GROQ]', q)
+    console.log('[PARAMS]', { s: sku })
+    const prod = await sanity.fetch<{printSpec: PrintSpec | null}>(q, {s: sku})
+    const spec = prod?.printSpec
+    if (!spec) {
+      return NextResponse.json({ error: 'no spec' }, { status: 400 })
+    }
+    const width  = Math.round(mm(spec.trimWidthIn + spec.bleedIn * 2, spec.dpi))
+    const height = Math.round(mm(spec.trimHeightIn + spec.bleedIn * 2, spec.dpi))
 
     const clamp = (n:number, min:number, max:number) => Math.max(min, Math.min(max, n))
     const composites: Overlay[] = []
@@ -89,7 +93,7 @@ export async function POST(req: NextRequest) {
     let img = sharp({ create: { width, height, channels: 4, background: '#ffffff' } }).composite(composites)
 
     const masterRatio = width / height
-    const targetRatio = (spec.trimW + spec.bleed * 2) / (spec.trimH + spec.bleed * 2)
+    const targetRatio = (spec.trimWidthIn + spec.bleedIn * 2) / (spec.trimHeightIn + spec.bleedIn * 2)
     if (targetRatio < masterRatio) {
       const cropW = Math.round(height * targetRatio)
       const offsetX = Math.floor((width - cropW) / 2)

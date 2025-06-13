@@ -5,7 +5,8 @@ import { getTemplatePages } from '@/app/library/getTemplatePages'
 export default async function Product({ params }: { params: { slug: string } }) {
   const tpl = templates.find((t) => t.slug === params.slug)
   if (!tpl) notFound()
-  const { coverImage } = await getTemplatePages(params.slug)
+  const data = await getTemplatePages(params.slug)
+  const coverImage = data?.coverImage
 
   return (
     <main className="p-6 flex flex-col items-center">

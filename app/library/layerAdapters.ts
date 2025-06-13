@@ -7,15 +7,9 @@
 
 import { urlFor }     from '@/sanity/lib/image'
 import type { Layer } from '@/app/components/FabricCanvas'
+import { mm, pageWidth, pageHeight } from '@/lib/printSpec'
 
-/* ---------- page constants (matches FabricCanvas) ---------------- */
-const DPI       = 300
-const mm        = (n: number) => (n / 25.4) * DPI
-const TRIM_W_MM = 150
-const TRIM_H_MM = 214
-const BLEED_MM  = 3
-const PAGE_W    = Math.round(mm(TRIM_W_MM + BLEED_MM * 2))
-const PAGE_H    = Math.round(mm(TRIM_H_MM + BLEED_MM * 2))
+
 
 /* ───────── helpers ──────────────────────────────────────────────── */
 function isSanityRef(src:any): src is { _type:'image'; asset:{ _ref:string } } {
@@ -47,10 +41,10 @@ if (raw._type === 'aiLayer') {
     y : raw.y ?? 100,
     width : raw.w,
     height: raw.h,
-    leftPct:   typeof raw.leftPct === 'number' ? raw.leftPct : ((raw.x ?? 0) / PAGE_W) * 100,
-    topPct:    typeof raw.topPct  === 'number' ? raw.topPct  : ((raw.y ?? 0) / PAGE_H) * 100,
-    widthPct:  typeof raw.widthPct  === 'number' ? raw.widthPct  : (raw.w != null ? (raw.w / PAGE_W) * 100 : undefined),
-    heightPct: typeof raw.heightPct === 'number' ? raw.heightPct : (raw.h != null ? (raw.h / PAGE_H) * 100 : undefined),
+    leftPct:   typeof raw.leftPct === 'number' ? raw.leftPct : ((raw.x ?? 0) / pageWidth()) * 100,
+    topPct:    typeof raw.topPct  === 'number' ? raw.topPct  : ((raw.y ?? 0) / pageHeight()) * 100,
+    widthPct:  typeof raw.widthPct  === 'number' ? raw.widthPct  : (raw.w != null ? (raw.w / pageWidth()) * 100 : undefined),
+    heightPct: typeof raw.heightPct === 'number' ? raw.heightPct : (raw.h != null ? (raw.h / pageHeight()) * 100 : undefined),
     scaleX: raw.scaleX,
     scaleY: raw.scaleY,
     ...(raw.flipX != null && { flipX: raw.flipX }),
@@ -76,10 +70,10 @@ if (raw._type === 'aiLayer') {
       y : raw.y ?? 0,
       width : raw.w,
       height: raw.h,
-      leftPct:   typeof raw.leftPct === 'number' ? raw.leftPct : ((raw.x ?? 0) / PAGE_W) * 100,
-      topPct:    typeof raw.topPct  === 'number' ? raw.topPct  : ((raw.y ?? 0) / PAGE_H) * 100,
-      widthPct:  typeof raw.widthPct  === 'number' ? raw.widthPct  : (raw.w != null ? (raw.w / PAGE_W) * 100 : undefined),
-      heightPct: typeof raw.heightPct === 'number' ? raw.heightPct : (raw.h != null ? (raw.h / PAGE_H) * 100 : undefined),
+      leftPct:   typeof raw.leftPct === 'number' ? raw.leftPct : ((raw.x ?? 0) / pageWidth()) * 100,
+      topPct:    typeof raw.topPct  === 'number' ? raw.topPct  : ((raw.y ?? 0) / pageHeight()) * 100,
+      widthPct:  typeof raw.widthPct  === 'number' ? raw.widthPct  : (raw.w != null ? (raw.w / pageWidth()) * 100 : undefined),
+      heightPct: typeof raw.heightPct === 'number' ? raw.heightPct : (raw.h != null ? (raw.h / pageHeight()) * 100 : undefined),
       scaleX: raw.scaleX,
       scaleY: raw.scaleY,
       ...(raw.flipX != null && { flipX: raw.flipX }),
@@ -102,10 +96,10 @@ if (raw._type === 'aiLayer') {
       x : raw.x ?? 0,
       y : raw.y ?? 0,
       width: raw.width ?? 200,
-      leftPct:   typeof raw.leftPct === 'number' ? raw.leftPct : ((raw.x ?? 0) / PAGE_W) * 100,
-      topPct:    typeof raw.topPct  === 'number' ? raw.topPct  : ((raw.y ?? 0) / PAGE_H) * 100,
-      widthPct:  typeof raw.widthPct  === 'number' ? raw.widthPct  : (raw.width != null ? (raw.width / PAGE_W) * 100 : undefined),
-      heightPct: typeof raw.heightPct === 'number' ? raw.heightPct : (raw.height != null ? (raw.height / PAGE_H) * 100 : undefined),
+      leftPct:   typeof raw.leftPct === 'number' ? raw.leftPct : ((raw.x ?? 0) / pageWidth()) * 100,
+      topPct:    typeof raw.topPct  === 'number' ? raw.topPct  : ((raw.y ?? 0) / pageHeight()) * 100,
+      widthPct:  typeof raw.widthPct  === 'number' ? raw.widthPct  : (raw.width != null ? (raw.width / pageWidth()) * 100 : undefined),
+      heightPct: typeof raw.heightPct === 'number' ? raw.heightPct : (raw.height != null ? (raw.height / pageHeight()) * 100 : undefined),
       fontSize  : raw.fontSize,
       fontFamily: raw.fontFamily,
       fontWeight: raw.fontWeight,
@@ -142,10 +136,10 @@ if (layer?._type === 'aiLayer') {
   return {
     ...rest,                                  // keep everything Sanity cares about
 
-    leftPct:   layer.leftPct ?? ((layer.x ?? 0) / PAGE_W) * 100,
-    topPct:    layer.topPct  ?? ((layer.y ?? 0) / PAGE_H) * 100,
-    widthPct:  layer.widthPct  ?? (width != null ? (width / PAGE_W) * 100 : undefined),
-    heightPct: layer.heightPct ?? (height != null ? (height / PAGE_H) * 100 : undefined),
+    leftPct:   layer.leftPct ?? ((layer.x ?? 0) / pageWidth()) * 100,
+    topPct:    layer.topPct  ?? ((layer.y ?? 0) / pageHeight()) * 100,
+    widthPct:  layer.widthPct  ?? (width != null ? (width / pageWidth()) * 100 : undefined),
+    heightPct: layer.heightPct ?? (height != null ? (height / pageHeight()) * 100 : undefined),
 
     // ── ensure the reference is in the correct shape ───────────────
     source:
@@ -170,10 +164,10 @@ if (layer?._type === 'aiLayer') {
     const { _isAI, selectable, editable, src, assetId, type, ...rest } = layer
     return {
       ...rest,
-      leftPct:   layer.leftPct ?? ((layer.x ?? 0) / PAGE_W) * 100,
-      topPct:    layer.topPct  ?? ((layer.y ?? 0) / PAGE_H) * 100,
-      widthPct:  layer.widthPct  ?? (layer.width != null ? (layer.width / PAGE_W) * 100 : undefined),
-      heightPct: layer.heightPct ?? (layer.height != null ? (layer.height / PAGE_H) * 100 : undefined),
+      leftPct:   layer.leftPct ?? ((layer.x ?? 0) / pageWidth()) * 100,
+      topPct:    layer.topPct  ?? ((layer.y ?? 0) / pageHeight()) * 100,
+      widthPct:  layer.widthPct  ?? (layer.width != null ? (layer.width / pageWidth()) * 100 : undefined),
+      heightPct: layer.heightPct ?? (layer.height != null ? (layer.height / pageHeight()) * 100 : undefined),
     }
   }
 
@@ -185,10 +179,10 @@ if (layer.type === 'image') {
     _type: 'editableImage',
     x: layer.x,
     y: layer.y,
-    leftPct:   layer.leftPct ?? ((layer.x ?? 0) / PAGE_W) * 100,
-    topPct:    layer.topPct  ?? ((layer.y ?? 0) / PAGE_H) * 100,
-    widthPct:  layer.widthPct  ?? (layer.width != null ? (layer.width / PAGE_W) * 100 : undefined),
-    heightPct: layer.heightPct ?? (layer.height != null ? (layer.height / PAGE_H) * 100 : undefined),
+    leftPct:   layer.leftPct ?? ((layer.x ?? 0) / pageWidth()) * 100,
+    topPct:    layer.topPct  ?? ((layer.y ?? 0) / pageHeight()) * 100,
+    widthPct:  layer.widthPct  ?? (layer.width != null ? (layer.width / pageWidth()) * 100 : undefined),
+    heightPct: layer.heightPct ?? (layer.height != null ? (layer.height / pageHeight()) * 100 : undefined),
     ...(layer.width  != null && { w: layer.width  }),
     ...(layer.height != null && { h: layer.height }),
     ...(layer.cropX  != null && { cropX: layer.cropX }),
@@ -228,10 +222,10 @@ else if (typeof layer.src === 'string') {
       text : layer.text,
       x : layer.x,
       y : layer.y,
-      leftPct:   layer.leftPct ?? ((layer.x ?? 0) / PAGE_W) * 100,
-      topPct:    layer.topPct  ?? ((layer.y ?? 0) / PAGE_H) * 100,
-      widthPct:  layer.widthPct  ?? (layer.width != null ? (layer.width / PAGE_W) * 100 : undefined),
-      heightPct: layer.heightPct ?? (layer.height != null ? (layer.height / PAGE_H) * 100 : undefined),
+      leftPct:   layer.leftPct ?? ((layer.x ?? 0) / pageWidth()) * 100,
+      topPct:    layer.topPct  ?? ((layer.y ?? 0) / pageHeight()) * 100,
+      widthPct:  layer.widthPct  ?? (layer.width != null ? (layer.width / pageWidth()) * 100 : undefined),
+      heightPct: layer.heightPct ?? (layer.height != null ? (layer.height / pageHeight()) * 100 : undefined),
       width: layer.width,
       fontSize  : layer.fontSize,
       fontFamily: layer.fontFamily,

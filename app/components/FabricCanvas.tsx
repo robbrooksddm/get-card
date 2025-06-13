@@ -15,24 +15,20 @@ import { fromSanity }        from '@/app/library/layerAdapters'
 import '@/lib/fabricDefaults'
 import { SEL_COLOR } from '@/lib/fabricDefaults';
 import { CropTool } from '@/lib/CropTool'
+import { mm, pageWidth, pageHeight, getPrintSpec } from '@/lib/printSpec'
 
 /* ---------- size helpers ---------------------------------------- */
-const DPI       = 300
-const mm        = (n: number) => (n / 25.4) * DPI
-const TRIM_W_MM = 150
-const TRIM_H_MM = 214
-const BLEED_MM  = 3
-const PAGE_W    = Math.round(mm(TRIM_W_MM + BLEED_MM * 2))
-const PAGE_H    = Math.round(mm(TRIM_H_MM + BLEED_MM * 2))
 const PREVIEW_W = 420
-const PREVIEW_H = Math.round(PAGE_H * PREVIEW_W / PAGE_W)
-const SCALE     = PREVIEW_W / PAGE_W
+const pageW    = () => pageWidth()
+const pageH    = () => pageHeight()
+const previewH = () => Math.round(pageH() * PREVIEW_W / pageW())
+const scale    = () => PREVIEW_W / pageW()
 
 // 4 CSS-px padding used by the hover outline
-const PAD  = 4 / SCALE;
+const PAD = () => 4 / scale();
 
 /** turn  gap (px) → a dashed-array scaled to canvas units */
-const dash = (gap: number) => [gap / SCALE, (gap - 2) / SCALE];
+const dash = (gap: number) => [gap / scale(), (gap - 2) / scale()];
 
 
 
@@ -154,10 +150,10 @@ const syncGhost = (
   const canvasRect = canvas.getBoundingClientRect()
   const { left, top, width, height } = img.getBoundingRect()
 
-  ghost.style.left   = `${canvasRect.left + left   * SCALE}px`
-  ghost.style.top    = `${canvasRect.top  + top    * SCALE}px`
-  ghost.style.width  = `${width  * SCALE}px`
-  ghost.style.height = `${height * SCALE}px`
+  ghost.style.left   = `${canvasRect.left + left   * scale()}px`
+  ghost.style.top    = `${canvasRect.top  + top    * scale()}px`
+  ghost.style.width  = `${width  * scale()}px`
+  ghost.style.height = `${height * scale()}px`
 }
 
 const getSrcUrl = (raw: Layer): string | undefined => {
@@ -191,10 +187,10 @@ const objToLayer = (o: fabric.Object): Layer => {
       x         : t.left || 0,
       y         : t.top  || 0,
       width     : t.width || 200,
-      leftPct   : ((t.left || 0) / PAGE_W) * 100,
-      topPct    : ((t.top  || 0) / PAGE_H) * 100,
-      widthPct  : ((t.width || 200) / PAGE_W) * 100,
-      heightPct : (t.getScaledHeight() / PAGE_H) * 100,
+      leftPct   : ((t.left || 0) / pageW()) * 100,
+      topPct    : ((t.top  || 0) / pageH()) * 100,
+      widthPct  : ((t.width || 200) / pageW()) * 100,
+      heightPct : (t.getScaledHeight() / pageH()) * 100,
       fontSize  : t.fontSize,
       fontFamily: t.fontFamily,
       fontWeight: t.fontWeight,
@@ -223,10 +219,10 @@ const objToLayer = (o: fabric.Object): Layer => {
     y      : i.top   || 0,
     width  : i.getScaledWidth(),
     height : i.getScaledHeight(),
-    leftPct  : ((i.left  || 0) / PAGE_W) * 100,
-    topPct   : ((i.top   || 0) / PAGE_H) * 100,
-    widthPct : (i.getScaledWidth()  / PAGE_W) * 100,
-    heightPct: (i.getScaledHeight() / PAGE_H) * 100,
+    leftPct  : ((i.left  || 0) / pageW()) * 100,
+    topPct   : ((i.top   || 0) / pageH()) * 100,
+    widthPct : (i.getScaledWidth()  / pageW()) * 100,
+    heightPct: (i.getScaledHeight() / pageH()) * 100,
     opacity: i.opacity,
     scaleX : i.scaleX,
     scaleY : i.scaleY,
@@ -295,22 +291,22 @@ const addGuides = (fc: fabric.Canvas, mode: Mode) => {
     )
 
   /* responsive safe-zone */
-  const safeX = PAGE_W * 0.1
-  const safeY = PAGE_H * 0.05
+  const safeX = pageW() * 0.1
+  const safeY = pageH() * 0.05
   ;[
-    mk([safeX, safeY, PAGE_W - safeX, safeY], 'safe-zone', '#34d399'),
-    mk([PAGE_W - safeX, safeY, PAGE_W - safeX, PAGE_H - safeY], 'safe-zone', '#34d399'),
-    mk([PAGE_W - safeX, PAGE_H - safeY, safeX, PAGE_H - safeY], 'safe-zone', '#34d399'),
-    mk([safeX, PAGE_H - safeY, safeX, safeY], 'safe-zone', '#34d399'),
+    mk([safeX, safeY, pageW() - safeX, safeY], 'safe-zone', '#34d399'),
+    mk([pageW() - safeX, safeY, pageW() - safeX, pageH() - safeY], 'safe-zone', '#34d399'),
+    mk([pageW() - safeX, pageH() - safeY, safeX, pageH() - safeY], 'safe-zone', '#34d399'),
+    mk([safeX, pageH() - safeY, safeX, safeY], 'safe-zone', '#34d399'),
   ].forEach(l => fc.add(l))
 
   if (mode === 'staff') {
-    const bleed = mm(BLEED_MM)
+    const bleed = mm(getPrintSpec().bleedIn * 25.4)
     ;[
-      mk([bleed, bleed, PAGE_W - bleed, bleed], 'bleed', '#f87171'),
-      mk([PAGE_W - bleed, bleed, PAGE_W - bleed, PAGE_H - bleed], 'bleed', '#f87171'),
-      mk([PAGE_W - bleed, PAGE_H - bleed, bleed, PAGE_H - bleed], 'bleed', '#f87171'),
-      mk([bleed, PAGE_H - bleed, bleed, bleed], 'bleed', '#f87171'),
+      mk([bleed, bleed, pageW() - bleed, bleed], 'bleed', '#f87171'),
+      mk([pageW() - bleed, bleed, pageW() - bleed, pageH() - bleed], 'bleed', '#f87171'),
+      mk([pageW() - bleed, pageH() - bleed, bleed, pageH() - bleed], 'bleed', '#f87171'),
+      mk([bleed, pageH() - bleed, bleed, bleed], 'bleed', '#f87171'),
     ].forEach(l => fc.add(l))
   }
 }
@@ -323,8 +319,8 @@ const addBackdrop = (fc: fabric.Canvas) => {
   const bg = new fabric.Rect({
     left   : 0,
     top    : 0,
-    width  : PAGE_W,
-    height : PAGE_H,
+    width  : pageW(),
+    height : pageH(),
     fill   : '#ffffff',         // ← solid white
     selectable       : false,
     evented          : false,
@@ -376,13 +372,13 @@ useEffect(() => {
   const container = canvasRef.current!.parentElement as HTMLElement | null;
   if (container) {
     container.style.width  = `${PREVIEW_W}px`;
-    container.style.height = `${PREVIEW_H}px`;
+    container.style.height = `${previewH()}px`;
     container.style.maxWidth  = `${PREVIEW_W}px`;
-    container.style.maxHeight = `${PREVIEW_H}px`;
+    container.style.maxHeight = `${previewH()}px`;
   }
   addBackdrop(fc);
   // keep the preview scaled to 420 px wide
-  fc.setViewportTransform([SCALE, 0, 0, SCALE, 0, 0]);
+  fc.setViewportTransform([scale(), 0, 0, scale(), 0, 0]);
 
   /* keep event coordinates aligned with any scroll/resize */
   const updateOffset = () => fc.calcOffset();
@@ -392,7 +388,7 @@ useEffect(() => {
 
   /* ── Crop‑tool wiring ────────────────────────────────────── */
   // create a reusable crop helper and keep it in a ref
-  const crop = new CropTool(fc, SCALE, SEL_COLOR);
+  const crop = new CropTool(fc, scale(), SEL_COLOR);
   cropToolRef.current = crop;
   (fc as any)._cropTool = crop;
   (fc as any)._syncLayers = () => syncLayersFromCanvas(fc, pageIdx);
@@ -422,7 +418,7 @@ const hoverHL = new fabric.Rect({
   originX:'left', originY:'top', strokeUniform:true,
   fill:'transparent',
   stroke:SEL_COLOR,
-  strokeWidth:1 / SCALE,
+  strokeWidth:1 / scale(),
   strokeDashArray:[],
   selectable:false, evented:false, visible:false,
   excludeFromExport:true,
@@ -456,10 +452,10 @@ fc.on('mouse:over', e => {
 
   const box = t.getBoundingRect(true, true)
   hoverHL.set({
-    width : box.width  + PAD * 2,
-    height: box.height + PAD * 2,
-    left  : box.left  - PAD,
-    top   : box.top   - PAD,
+    width : box.width  + PAD() * 2,
+    height: box.height + PAD() * 2,
+    left  : box.left  - PAD(),
+    top   : box.top   - PAD(),
     visible: true,
   })
   hoverHL.setCoords()
@@ -483,15 +479,15 @@ addGuides(fc, mode)                           // add guides based on mode
       y      : t.top,
       scaleX : t.scaleX,
       scaleY : t.scaleY,
-      leftPct  : ((t.left  || 0) / PAGE_W) * 100,
-      topPct   : ((t.top   || 0) / PAGE_H) * 100,
+      leftPct  : ((t.left  || 0) / pageW()) * 100,
+      topPct   : ((t.top   || 0) / pageH()) * 100,
     }
     if (t.type === 'image') Object.assign(d, {
       width  : t.getScaledWidth(),
       height : t.getScaledHeight(),
       opacity: t.opacity,
-      widthPct : (t.getScaledWidth()  / PAGE_W) * 100,
-      heightPct: (t.getScaledHeight() / PAGE_H) * 100,
+      widthPct : (t.getScaledWidth()  / pageW()) * 100,
+      heightPct: (t.getScaledHeight() / pageH()) * 100,
       ...(t.cropX != null && { cropX: t.cropX }),
       ...(t.cropY != null && { cropY: t.cropY }),
       ...(t.width  != null && { cropW: t.width  }),
@@ -508,8 +504,8 @@ addGuides(fc, mode)                           // add guides based on mode
       textAlign  : t.textAlign,
       lineHeight : t.lineHeight,
       opacity    : t.opacity,
-      widthPct  : (t.getScaledWidth()  / PAGE_W) * 100,
-      heightPct : (t.getScaledHeight() / PAGE_H) * 100,
+      widthPct  : (t.getScaledWidth()  / pageW()) * 100,
+      heightPct : (t.getScaledHeight() / pageH()) * 100,
     })
     updateLayer(pageIdx, t.layerIdx, d)
     setTimeout(()=>{ isEditing.current = false })
@@ -532,10 +528,10 @@ addGuides(fc, mode)                           // add guides based on mode
       opacity    : t.opacity,
       width      : t.getScaledWidth(),
       height     : t.getScaledHeight(),
-      leftPct    : ((t.left || 0) / PAGE_W) * 100,
-      topPct     : ((t.top  || 0) / PAGE_H) * 100,
-      widthPct   : (t.getScaledWidth()  / PAGE_W) * 100,
-      heightPct  : (t.getScaledHeight() / PAGE_H) * 100,
+      leftPct    : ((t.left || 0) / pageW()) * 100,
+      topPct     : ((t.top  || 0) / pageH()) * 100,
+      widthPct   : (t.getScaledWidth()  / pageW()) * 100,
+      heightPct  : (t.getScaledHeight() / pageH()) * 100,
     })
     setTimeout(()=>{ isEditing.current = false })
   })
@@ -714,10 +710,10 @@ window.addEventListener('keydown', onKey)
       const ly: Layer | null = (raw as any).type ? raw as Layer : fromSanity(raw)
       if (!ly) continue
 
-      if (ly.leftPct != null) ly.x = (ly.leftPct / 100) * PAGE_W
-      if (ly.topPct  != null) ly.y = (ly.topPct  / 100) * PAGE_H
-      if (ly.widthPct  != null) ly.width  = (ly.widthPct  / 100) * PAGE_W
-      if (ly.heightPct != null) ly.height = (ly.heightPct / 100) * PAGE_H
+      if (ly.leftPct != null) ly.x = (ly.leftPct / 100) * pageW()
+      if (ly.topPct  != null) ly.y = (ly.topPct  / 100) * pageH()
+      if (ly.widthPct  != null) ly.width  = (ly.widthPct  / 100) * pageW()
+      if (ly.heightPct != null) ly.height = (ly.heightPct / 100) * pageH()
 
 /* ---------- IMAGES --------------------------------------------- */
 if (ly.type === 'image' && (ly.src || ly.srcUrl)) {
@@ -744,7 +740,7 @@ if (ly.type === 'image' && (ly.src || ly.srcUrl)) {
 
           /* scale */
           if (ly.scaleX == null || ly.scaleY == null) {
-            const s = Math.min(1, PAGE_W / img.width!, PAGE_H / img.height!)
+            const s = Math.min(1, pageW() / img.width!, pageH() / img.height!)
             img.scale(s)
           } else {
             img.set({ scaleX: ly.scaleX, scaleY: ly.scaleY })
@@ -852,7 +848,7 @@ img.on('mouseup', () => {
         const tb = new fabric.Textbox(ly.text, {
           left: ly.x, top: ly.y, originX: 'left', originY: 'top',
           width: ly.width ?? 200,
-          fontSize: ly.fontSize ?? Math.round(32 / SCALE),
+          fontSize: ly.fontSize ?? Math.round(32 / scale()),
           fontFamily: ly.fontFamily ?? 'Arial',
           fontWeight: ly.fontWeight ?? 'normal',
           fontStyle: ly.fontStyle ?? 'normal',
@@ -887,8 +883,8 @@ img.on('mouseup', () => {
     <canvas
       ref={canvasRef}
       width={PREVIEW_W}
-      height={PREVIEW_H}
-      style={{ width: PREVIEW_W, height: PREVIEW_H }}   // lock CSS size
+      height={previewH()}
+      style={{ width: PREVIEW_W, height: previewH() }}   // lock CSS size
       className="border shadow rounded"
     />
   )

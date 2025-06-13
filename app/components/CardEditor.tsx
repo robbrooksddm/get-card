@@ -16,6 +16,8 @@ import PreviewModal                    from './PreviewModal'
 import { CropTool }                     from '@/lib/CropTool'
 import WaltyEditorHeader                from './WaltyEditorHeader'
 import type { TemplatePage }            from './FabricCanvas'
+import type { PrintSpec }               from '@/sanity/lib/types'
+import { setPrintSpec }                 from '@/lib/printSpec'
 
 
 /* ---------- helpers ------------------------------------------------ */
@@ -60,10 +62,12 @@ function CoachMark({ anchor, onClose }: { anchor: DOMRect | null; onClose: () =>
 /* ────────────────────────────────────────────────────────────────── */
 export default function CardEditor({
   initialPages,
+  printSpec,
   mode = 'customer',
   onSave,
 }: {
   initialPages: TemplatePage[] | undefined
+  printSpec: PrintSpec
   mode?: Mode
   onSave?: SaveFn
 }) {
@@ -72,6 +76,7 @@ export default function CardEditor({
     useEditor.getState().setPages(
       Array.isArray(initialPages) && initialPages.length === 4 ? initialPages : EMPTY,
     )
+    setPrintSpec(printSpec)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

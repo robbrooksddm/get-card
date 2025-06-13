@@ -27,8 +27,10 @@ export async function getPromptForPlaceholder(
       "ratio"     : coalesce(ratio,      "1:1"),
       "quality"   : coalesce(quality,    "medium"),
       "background": coalesce(background, "transparent"),
-      "faceSwap"  : coalesce(doFaceSwap, true)
-    }
+    "faceSwap"  : coalesce(doFaceSwap, true)
+  }
   `
+  console.log('[GROQ]', query)
+  console.log('[PARAMS]', { id })
   return sanity.fetch(query, { id })
 }

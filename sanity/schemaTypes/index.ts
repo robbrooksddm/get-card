@@ -15,6 +15,7 @@ import aiLayer       from './aiLayer'
 import editableImage from './editableImage'
 import editableText  from './editableText'
 import heroSection   from './heroSection'
+import printSpec     from './printSpec'
 
 /* facet look-ups ----------------------------------------------- */
 import occasion from './occasion'   // ← RE-ADDED ✔
@@ -36,6 +37,7 @@ export const schemaTypes = [
   editableImage,
   editableText,
   heroSection,
+  printSpec,
 
   /* facets */
   occasion,
