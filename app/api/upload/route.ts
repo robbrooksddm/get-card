@@ -3,6 +3,7 @@
  *********************************************************************/
 import { NextRequest, NextResponse } from 'next/server'
 import { sanityWriteClient as sanity } from '@/sanity/lib/client'
+import sharp from 'sharp'
 export async function POST (req: NextRequest) {
   const data = await req.formData()
   const file = data.get('file') as File | null
@@ -11,7 +12,20 @@ export async function POST (req: NextRequest) {
   }
 
   /* 1. convert the File into a Node.js Buffer so Sanity can read it */
-  const buffer = Buffer.from(await file.arrayBuffer())
+  let buffer = Buffer.from(await file.arrayBuffer())
+
+  /* 1b. downscale very large images to keep Fabric stable */
+  try {
+    const img = sharp(buffer)
+    const meta = await img.metadata()
+    if ((meta.width ?? 0) > 4000 || (meta.height ?? 0) > 4000) {
+      buffer = await img
+        .resize({ width: 4000, height: 4000, fit: 'inside' })
+        .toBuffer()
+    }
+  } catch (err) {
+    console.error('[upload] resize failed', err)
+  }
 
   /* 2. push it straight into Sanity’s asset pipeline */
   const asset = await sanity.assets.upload('image', buffer, {

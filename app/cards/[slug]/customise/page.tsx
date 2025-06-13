@@ -5,6 +5,10 @@
 import CustomiseClient from "./CustomiseClient";
 import { getTemplatePages } from '@/app/library/getTemplatePages'
 
+// Ensure the latest draft is fetched on every visit
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // Path: app/cards/[slug]/customise/page.tsx
 // This is a **server component**. In Next 15 `params` is a Promise, so we need to
 // unwrap it with `await` before we read `slug`.
