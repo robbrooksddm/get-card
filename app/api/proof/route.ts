@@ -120,8 +120,10 @@ export async function POST(req: NextRequest) {
     if (targetRatio < masterRatio) {
       const cropW = Math.round(height * targetRatio)
       const offsetX = Math.floor((width - cropW) / 2)
-      img = img.extract({ left: offsetX, top: 0, width: cropW, height })
-               .extend({ left: 0, right: 0, top: 0, bottom: 0, background: '#ffffff' })
+      img = img
+        .clone()
+        .extract({ left: offsetX, top: 0, width: cropW, height })
+        .extend({ left: offsetX, right: offsetX, top: 0, bottom: 0, background: '#ffffff' })
     }
 
     const out = await img
