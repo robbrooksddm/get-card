@@ -3,13 +3,11 @@
   ────────────────────────────────────────────────────────────*/
 
 import {createClient} from '@sanity/client'
+import {apiVersion, dataset, projectId} from '@/sanity/env'
 
 /*────────────────────────────────────────────────────────────
   Environment variables
   ────────────────────────────────────────────────────────────*/
-const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID!
-const dataset   = process.env.NEXT_PUBLIC_SANITY_DATASET!
-
 /* Read‑only token (Viewer) used **only** in the card‑editor to
    fetch drafts + published docs. Leave undefined on the public site. */
 const readToken  = process.env.SANITY_READ_TOKEN  || undefined
@@ -23,7 +21,7 @@ const writeToken = process.env.SANITY_WRITE_TOKEN || undefined
 export const sanity = createClient({
   projectId,
   dataset,
-  apiVersion : '2023-10-01',
+  apiVersion,
   perspective: 'published',   // ⇠ only published docs
   useCdn     : true,          // ⇠ fastest / cached
 })
@@ -34,7 +32,7 @@ export const sanity = createClient({
 export const sanityPreview = createClient({
   projectId,
   dataset,
-  apiVersion : '2023-10-01',
+  apiVersion,
   token      : readToken,     // Viewer token
   perspective: 'previewDrafts',
   useCdn     : false,         // drafts never reach the CDN
@@ -46,7 +44,7 @@ export const sanityPreview = createClient({
 export const sanityWriteClient = createClient({
   projectId,
   dataset,
-  apiVersion : '2023-10-01',
+  apiVersion,
   token      : writeToken,    // Contributor token
   perspective: 'previewDrafts',
   useCdn     : false,
