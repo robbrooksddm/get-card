@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import sharp from 'sharp'
+import { PRINT_SPECS, inchesToPx } from '@/lib/printSpecs'
 
 interface Overlay extends sharp.OverlayOptions {
   /** Global opacity for the overlay; sharp's types omit this */
@@ -8,12 +9,7 @@ interface Overlay extends sharp.OverlayOptions {
 
 export const dynamic = 'force-dynamic'
 
-const DPI = 300
-const mm = (n:number) => (n / 25.4) * DPI
-
-const SPECS = {
-  'card-7x5': { trimW: 150, trimH: 214, bleed: 3 },
-} as const
+type Sku = keyof typeof PRINT_SPECS
 
 function esc(s: string) {
   return s.replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]!))
@@ -21,13 +17,25 @@ function esc(s: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { pages, sku } = await req.json() as { pages:any[]; sku:keyof typeof SPECS }
-    if (!Array.isArray(pages) || !SPECS[sku]) {
+    const { pages = [], pageImages, sku } = await req.json() as { pages?:any[]; pageImages?:string[]; sku:Sku }
+    if ((!Array.isArray(pages) && !Array.isArray(pageImages)) || !PRINT_SPECS[sku]) {
       return NextResponse.json({ error: 'bad input' }, { status: 400 })
     }
-    const spec = SPECS[sku]
-    const width  = Math.round(mm(spec.trimW + spec.bleed * 2))
-    const height = Math.round(mm(spec.trimH + spec.bleed * 2))
+    const spec = PRINT_SPECS[sku]
+    const width  = Math.round(inchesToPx(spec.trimW + spec.bleed * 2, spec.dpi))
+    const height = Math.round(inchesToPx(spec.trimH + spec.bleed * 2, spec.dpi))
+
+    if (Array.isArray(pageImages) && pageImages.length) {
+      try {
+        const raw = pageImages[0].replace(/^data:image\/[^;]+;base64,/, '')
+        const buf = Buffer.from(raw, 'base64')
+        const out = await sharp(buf).resize(width, height, { fit: 'fill' }).png().toBuffer()
+        return new NextResponse(out, { headers: { 'content-type': 'image/png' } })
+      } catch (err) {
+        console.error('[proof/img]', err)
+        return NextResponse.json({ error: 'server' }, { status: 500 })
+      }
+    }
 
     const clamp = (n:number, min:number, max:number) => Math.max(min, Math.min(max, n))
     const composites: Overlay[] = []

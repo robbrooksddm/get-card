@@ -8,31 +8,24 @@
  *********************************************************************/
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fabric }            from 'fabric'
 import { useEditor }         from './EditorStore'
 import { fromSanity }        from '@/app/library/layerAdapters'
+import { PRINT_SPECS, inchesToPx, mmToPx } from '@/lib/printSpecs'
 import '@/lib/fabricDefaults'
 import { SEL_COLOR } from '@/lib/fabricDefaults';
 import { CropTool } from '@/lib/CropTool'
 
 /* ---------- size helpers ---------------------------------------- */
-const DPI       = 300
-const mm        = (n: number) => (n / 25.4) * DPI
-const TRIM_W_MM = 150
-const TRIM_H_MM = 214
-const BLEED_MM  = 3
-const PAGE_W    = Math.round(mm(TRIM_W_MM + BLEED_MM * 2))
-const PAGE_H    = Math.round(mm(TRIM_H_MM + BLEED_MM * 2))
-const PREVIEW_W = 420
-const PREVIEW_H = Math.round(PAGE_H * PREVIEW_W / PAGE_W)
-const SCALE     = PREVIEW_W / PAGE_W
-
-// 4 CSS-px padding used by the hover outline
-const PAD  = 4 / SCALE;
+const spec      = PRINT_SPECS['card-7x5']
+const PAGE_W    = Math.round(inchesToPx(spec.trimW + spec.bleed * 2, spec.dpi))
+const PAGE_H    = Math.round(inchesToPx(spec.trimH + spec.bleed * 2, spec.dpi))
+const DEFAULT_PREVIEW_W = 420
+const MAX_PREVIEW       = 700
 
 /** turn  gap (px) → a dashed-array scaled to canvas units */
-const dash = (gap: number) => [gap / SCALE, (gap - 2) / SCALE];
+const dash = (gap: number, scale:number) => [gap / scale, (gap - 2) / scale];
 
 
 
@@ -150,14 +143,15 @@ const syncGhost = (
   img   : fabric.Image,
   ghost : HTMLDivElement,
   canvas: HTMLCanvasElement,
+  scale : number,
 ) => {
   const canvasRect = canvas.getBoundingClientRect()
   const { left, top, width, height } = img.getBoundingRect()
 
-  ghost.style.left   = `${canvasRect.left + left   * SCALE}px`
-  ghost.style.top    = `${canvasRect.top  + top    * SCALE}px`
-  ghost.style.width  = `${width  * SCALE}px`
-  ghost.style.height = `${height * SCALE}px`
+  ghost.style.left   = `${canvasRect.left + left   * scale}px`
+  ghost.style.top    = `${canvasRect.top  + top    * scale}px`
+  ghost.style.width  = `${width  * scale}px`
+  ghost.style.height = `${height * scale}px`
 }
 
 const getSrcUrl = (raw: Layer): string | undefined => {
@@ -274,9 +268,9 @@ const syncLayersFromCanvas = (fc: fabric.Canvas, pageIdx: number) => {
 type Mode = 'staff' | 'customer'
 type GuideName = 'safe-zone' | 'bleed'
 
-const addGuides = (fc: fabric.Canvas, mode: Mode) => {
+const addGuides = (fc: fabric.Canvas, mode: Mode, scale: number) => {
   fc.getObjects().filter(o => (o as any)._guide).forEach(o => fc.remove(o))
-  const strokeW = mm(0.5)
+  const strokeW = mmToPx(0.5, spec.dpi)
   const mk = (
     xy: [number, number, number, number],
     name: GuideName,
@@ -286,7 +280,7 @@ const addGuides = (fc: fabric.Canvas, mode: Mode) => {
       new fabric.Line(xy, {
         stroke: color,
         strokeWidth: strokeW,
-        strokeDashArray: dash(6),
+        strokeDashArray: dash(6, scale),
         selectable: false,
         evented: false,
         excludeFromExport: true,
@@ -305,7 +299,7 @@ const addGuides = (fc: fabric.Canvas, mode: Mode) => {
   ].forEach(l => fc.add(l))
 
   if (mode === 'staff') {
-    const bleed = mm(BLEED_MM)
+    const bleed = inchesToPx(spec.bleed, spec.dpi)
     ;[
       mk([bleed, bleed, PAGE_W - bleed, bleed], 'bleed', '#f87171'),
       mk([PAGE_W - bleed, bleed, PAGE_W - bleed, PAGE_H - bleed], 'bleed', '#f87171'),
@@ -349,6 +343,7 @@ interface Props {
 export default function FabricCanvas ({ pageIdx, page, onReady, isCropping = false, onCroppingChange, mode = 'customer' }: Props) {
   const canvasRef    = useRef<HTMLCanvasElement>(null)
   const fcRef        = useRef<fabric.Canvas | null>(null)
+  const scaleRef     = useRef(1)
   const maskRectsRef = useRef<fabric.Rect[]>([]);
   const hoverRef     = useRef<fabric.Rect | null>(null)
   const hydrating    = useRef(false)
@@ -356,6 +351,10 @@ export default function FabricCanvas ({ pageIdx, page, onReady, isCropping = fal
 
   const cropToolRef = useRef<CropTool | null>(null)
   const croppingRef = useRef(false)
+
+  const [previewW, setPreviewW] = useState(
+    typeof window === 'undefined' ? DEFAULT_PREVIEW_W : DEFAULT_PREVIEW_W
+  )
 
 
 
@@ -374,15 +373,30 @@ useEffect(() => {
   });
   /* --- keep Fabric’s wrapper the same size as the visible preview --- */
   const container = canvasRef.current!.parentElement as HTMLElement | null;
-  if (container) {
-    container.style.width  = `${PREVIEW_W}px`;
-    container.style.height = `${PREVIEW_H}px`;
-    container.style.maxWidth  = `${PREVIEW_W}px`;
-    container.style.maxHeight = `${PREVIEW_H}px`;
+  const calcSize = () => {
+    const aside = document.querySelector('aside') as HTMLElement | null
+    const side  = aside ? aside.offsetWidth : 0
+    const w = Math.min(MAX_PREVIEW, window.innerWidth - side - 80)
+    setPreviewW(w)
+    scaleRef.current = w / PAGE_W
+    if (container) {
+      const h = Math.round(PAGE_H * w / PAGE_W)
+      container.style.width = `${w}px`
+      container.style.height = `${h}px`
+      container.style.maxWidth = `${w}px`
+      container.style.maxHeight = `${h}px`
+    }
+    fc.setViewportTransform([scaleRef.current, 0, 0, scaleRef.current, 0, 0])
+    fc.calcOffset()
   }
+  calcSize()
+  let rTimer: NodeJS.Timeout | undefined
+  const onResize = () => {
+    clearTimeout(rTimer)
+    rTimer = setTimeout(calcSize, 100)
+  }
+  window.addEventListener('resize', onResize)
   addBackdrop(fc);
-  // keep the preview scaled to 420 px wide
-  fc.setViewportTransform([SCALE, 0, 0, SCALE, 0, 0]);
 
   /* keep event coordinates aligned with any scroll/resize */
   const updateOffset = () => fc.calcOffset();
@@ -392,7 +406,7 @@ useEffect(() => {
 
   /* ── Crop‑tool wiring ────────────────────────────────────── */
   // create a reusable crop helper and keep it in a ref
-  const crop = new CropTool(fc, SCALE, SEL_COLOR);
+  const crop = new CropTool(fc, scaleRef.current, SEL_COLOR);
   cropToolRef.current = crop;
   (fc as any)._cropTool = crop;
   (fc as any)._syncLayers = () => syncLayersFromCanvas(fc, pageIdx);
@@ -422,7 +436,7 @@ const hoverHL = new fabric.Rect({
   originX:'left', originY:'top', strokeUniform:true,
   fill:'transparent',
   stroke:SEL_COLOR,
-  strokeWidth:1 / SCALE,
+  strokeWidth:1 / scaleRef.current,
   strokeDashArray:[],
   selectable:false, evented:false, visible:false,
   excludeFromExport:true,
@@ -455,11 +469,12 @@ fc.on('mouse:over', e => {
   if (fc.getActiveObject() === t) return           // skip active selection
 
   const box = t.getBoundingRect(true, true)
+  const pad = 4 / scaleRef.current
   hoverHL.set({
-    width : box.width  + PAD * 2,
-    height: box.height + PAD * 2,
-    left  : box.left  - PAD,
-    top   : box.top   - PAD,
+    width : box.width  + pad * 2,
+    height: box.height + pad * 2,
+    left  : box.left  - pad,
+    top   : box.top   - pad,
     visible: true,
   })
   hoverHL.setCoords()
@@ -471,7 +486,7 @@ fc.on('mouse:over', e => {
   fc.requestRenderAll()
 })
 
-addGuides(fc, mode)                           // add guides based on mode
+addGuides(fc, mode, scaleRef.current)         // add guides based on mode
   /* ── 4.5 ▸ Fabric ➜ Zustand sync ──────────────────────────── */
   fc.on('object:modified', e=>{
     isEditing.current = true
@@ -670,6 +685,8 @@ window.addEventListener('keydown', onKey)
       if (scrollHandler) window.removeEventListener('scroll', scrollHandler)
       window.removeEventListener('scroll', updateOffset)
       window.removeEventListener('resize', updateOffset)
+      window.removeEventListener('resize', onResize)
+      if (rTimer) clearTimeout(rTimer)
       // tidy up crop‑tool listeners
       fc.off('mouse:dblclick', dblHandler);
       window.removeEventListener('keydown', keyCropHandler);
@@ -806,7 +823,11 @@ img.on('mouseup', () => {
               img.on('mouseout',  () => { ghost!.style.opacity = '0' })
             }
 
-            const doSync = () => canvasRef.current && ghost && syncGhost(img, ghost, canvasRef.current)
+            const doSync = () => {
+              if (canvasRef.current && ghost) {
+                syncGhost(img, ghost, canvasRef.current, scaleRef.current)
+              }
+            }
             doSync()
             img.on('moving',   doSync)
                .on('scaling',  doSync)
@@ -852,7 +873,7 @@ img.on('mouseup', () => {
         const tb = new fabric.Textbox(ly.text, {
           left: ly.x, top: ly.y, originX: 'left', originY: 'top',
           width: ly.width ?? 200,
-          fontSize: ly.fontSize ?? Math.round(32 / SCALE),
+          fontSize: ly.fontSize ?? Math.round(32 / scaleRef.current),
           fontFamily: ly.fontFamily ?? 'Arial',
           fontWeight: ly.fontWeight ?? 'normal',
           fontStyle: ly.fontStyle ?? 'normal',
@@ -871,7 +892,7 @@ img.on('mouseup', () => {
       }
     }
 
-    addGuides(fc, mode)
+    addGuides(fc, mode, scaleRef.current)
     hoverRef.current?.bringToFront()
     fc.requestRenderAll();
     hydrating.current = false
@@ -883,12 +904,13 @@ img.on('mouseup', () => {
   }, [page])
 
   /* ---------- render ----------------------------------------- */
+  const previewH = Math.round(PAGE_H * previewW / PAGE_W)
   return (
     <canvas
       ref={canvasRef}
-      width={PREVIEW_W}
-      height={PREVIEW_H}
-      style={{ width: PREVIEW_W, height: PREVIEW_H }}   // lock CSS size
+      width={previewW}
+      height={previewH}
+      style={{ width: previewW, height: previewH }}   // lock CSS size
       className="border shadow rounded"
     />
   )

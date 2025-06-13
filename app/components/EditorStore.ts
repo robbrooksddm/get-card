@@ -4,15 +4,12 @@
  *********************************************************************/
 import { create } from 'zustand'
 import type { Layer, TemplatePage } from './FabricCanvas'
+import { PRINT_SPECS, inchesToPx } from '@/lib/printSpecs'
 
 /* ---------- shared page constants (matches FabricCanvas) --------- */
-const DPI       = 300
-const mm        = (n: number) => (n / 25.4) * DPI
-const TRIM_W_MM = 150
-const TRIM_H_MM = 214
-const BLEED_MM  = 3
-const PAGE_W    = Math.round(mm(TRIM_W_MM + BLEED_MM * 2))
-const PAGE_H    = Math.round(mm(TRIM_H_MM + BLEED_MM * 2))
+const spec   = PRINT_SPECS['card-7x5']
+const PAGE_W = Math.round(inchesToPx(spec.trimW + spec.bleed * 2, spec.dpi))
+const PAGE_H = Math.round(inchesToPx(spec.trimH + spec.bleed * 2, spec.dpi))
 
 /* ---------- helpers ------------------------------------------------ */
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v))
