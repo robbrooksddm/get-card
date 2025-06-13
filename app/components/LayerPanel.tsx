@@ -100,7 +100,8 @@ export default function LayerPanel() {
   const [open, setOpen] = useState(true);
 
   if (!pages[activePage]) return null;
-  const ids = pages[activePage].layers.map((_, i) => i.toString());
+  const layerOrder = pages[activePage].layers.map((_, i) => pages[activePage].layers.length - 1 - i);
+  const ids = layerOrder.map(i => i.toString());
 
   /* drag‑and‑drop */
   const sensors = useSensors(useSensor(PointerSensor));
@@ -151,8 +152,8 @@ export default function LayerPanel() {
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <SortableContext items={ids} strategy={verticalListSortingStrategy}>
           <ul className="scrollbar-hidden flex h-[calc(100%-330px)] flex-col gap-1 overflow-y-auto px-4 pb-6">
-            {ids.map((id, i) => (
-              <Row key={id} id={id} idx={i} />
+            {layerOrder.map((idx) => (
+              <Row key={idx} id={idx.toString()} idx={idx} />
             ))}
           </ul>
         </SortableContext>

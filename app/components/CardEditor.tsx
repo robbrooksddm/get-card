@@ -258,6 +258,40 @@ const handlePreview = () => {
   setPreviewOpen(true)
 }
 
+/* download proof */
+const handleProof = async () => {
+  canvasMap.forEach(fc => {
+    const tool = (fc as any)?._cropTool as CropTool | undefined
+    if (tool?.isActive) tool.commit()
+  })
+  canvasMap.forEach(fc => {
+    const sync = (fc as any)?._syncLayers as (() => void) | undefined
+    if (sync) sync()
+  })
+  const pages = useEditor.getState().pages
+  try {
+    const res = await fetch('/api/proof', {
+      method : 'POST',
+      headers: { 'content-type': 'application/json' },
+      body   : JSON.stringify({ pages, sku: 'card-7x5' }),
+    })
+    if (res.ok) {
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'proof.png'
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    }
+  } catch (err) {
+    console.error('proof', err)
+  }
+}
+
   /* 7 ─ coach-mark ----------------------------------------------- */
   const [anchor, setAnchor] = useState<DOMRect | null>(null)
   const ran = useRef(false)
@@ -308,7 +342,9 @@ const handlePreview = () => {
         onUndo={undo}
         onRedo={redo}
         onSave={handleSave}
+        onProof={mode === 'staff' ? handleProof : undefined}
         saving={saving}
+        mode={mode}
       />
 
       <div className="flex flex-1 relative bg-[--walty-cream] lg:max-w-6xl mx-auto">

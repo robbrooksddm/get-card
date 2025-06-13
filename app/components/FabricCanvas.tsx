@@ -90,6 +90,16 @@ export interface Layer {
   width:  number
   height?: number
 
+  /** geometry relative to the full canvas (0–100 %) */
+  leftPct?:   number
+  topPct?:    number
+  widthPct?:  number
+  heightPct?: number
+
+  /** image flips */
+  flipX?:     boolean
+  flipY?:     boolean
+
   opacity?:   number
   scaleX?:    number
   scaleY?:    number
@@ -162,7 +172,12 @@ const getSrcUrl = (raw: Layer): string | undefined => {
       const id = raw.src.asset._ref             // image-xyz-2000x2000-png
         .replace('image-', '')                  // xyz-2000x2000-png
         .replace(/\-(png|jpg|jpeg|webp)$/, '')  // xyz-2000x2000
-      return `https://cdn.sanity.io/images/${process.env.NEXT_PUBLIC_SANITY_PROJECT_ID}/production/${id}.png`
+      const pid =
+        process.env.NEXT_PUBLIC_SANITY_PROJECT_ID ||
+        process.env.SANITY_STUDIO_PROJECT_ID
+      return pid
+        ? `https://cdn.sanity.io/images/${pid}/production/${id}.png`
+        : undefined
     }
   
     /* nothing usable yet */
@@ -181,6 +196,10 @@ const objToLayer = (o: fabric.Object): Layer => {
       x         : t.left || 0,
       y         : t.top  || 0,
       width     : t.width || 200,
+      leftPct   : ((t.left || 0) / PAGE_W) * 100,
+      topPct    : ((t.top  || 0) / PAGE_H) * 100,
+      widthPct  : ((t.width || 200) / PAGE_W) * 100,
+      heightPct : (t.getScaledHeight() / PAGE_H) * 100,
       fontSize  : t.fontSize,
       fontFamily: t.fontFamily,
       fontWeight: t.fontWeight,
@@ -209,9 +228,15 @@ const objToLayer = (o: fabric.Object): Layer => {
     y      : i.top   || 0,
     width  : i.getScaledWidth(),
     height : i.getScaledHeight(),
+    leftPct  : ((i.left  || 0) / PAGE_W) * 100,
+    topPct   : ((i.top   || 0) / PAGE_H) * 100,
+    widthPct : (i.getScaledWidth()  / PAGE_W) * 100,
+    heightPct: (i.getScaledHeight() / PAGE_H) * 100,
     opacity: i.opacity,
     scaleX : i.scaleX,
     scaleY : i.scaleY,
+    flipX  : (i as any).flipX,
+    flipY  : (i as any).flipY,
   }
 
   if (i.cropX != null) layer.cropX = i.cropX
@@ -231,8 +256,7 @@ const syncLayersFromCanvas = (fc: fabric.Canvas, pageIdx: number) => {
       !(o as any)._backdrop &&
       !(o as any).excludeFromExport &&
       (o as any).type !== 'activeSelection'      // skip wrapper
-    )
-    .reverse();                                  // bottom → top
+    );                                           // bottom → top
 
   /* remember original src on pasted images */
   objs.forEach(o => {
@@ -464,11 +488,15 @@ addGuides(fc, mode)                           // add guides based on mode
       y      : t.top,
       scaleX : t.scaleX,
       scaleY : t.scaleY,
+      leftPct  : ((t.left  || 0) / PAGE_W) * 100,
+      topPct   : ((t.top   || 0) / PAGE_H) * 100,
     }
     if (t.type === 'image') Object.assign(d, {
       width  : t.getScaledWidth(),
       height : t.getScaledHeight(),
       opacity: t.opacity,
+      widthPct : (t.getScaledWidth()  / PAGE_W) * 100,
+      heightPct: (t.getScaledHeight() / PAGE_H) * 100,
       ...(t.cropX != null && { cropX: t.cropX }),
       ...(t.cropY != null && { cropY: t.cropY }),
       ...(t.width  != null && { cropW: t.width  }),
@@ -485,6 +513,8 @@ addGuides(fc, mode)                           // add guides based on mode
       textAlign  : t.textAlign,
       lineHeight : t.lineHeight,
       opacity    : t.opacity,
+      widthPct  : (t.getScaledWidth()  / PAGE_W) * 100,
+      heightPct : (t.getScaledHeight() / PAGE_H) * 100,
     })
     updateLayer(pageIdx, t.layerIdx, d)
     setTimeout(()=>{ isEditing.current = false })
@@ -507,6 +537,10 @@ addGuides(fc, mode)                           // add guides based on mode
       opacity    : t.opacity,
       width      : t.getScaledWidth(),
       height     : t.getScaledHeight(),
+      leftPct    : ((t.left || 0) / PAGE_W) * 100,
+      topPct     : ((t.top  || 0) / PAGE_H) * 100,
+      widthPct   : (t.getScaledWidth()  / PAGE_W) * 100,
+      heightPct  : (t.getScaledHeight() / PAGE_H) * 100,
     })
     setTimeout(()=>{ isEditing.current = false })
   })
@@ -680,10 +714,17 @@ window.addEventListener('keydown', onKey)
     hoverRef.current && fc.add(hoverRef.current)
 
     /* bottom ➜ top keeps original z-order */
-    for (let idx = page.layers.length - 1; idx >= 0; idx--) {
+    const absW = fc.getWidth()
+    const absH = fc.getHeight()
+    for (let idx = 0; idx < page.layers.length; idx++) {
       const raw = page.layers[idx]
-      const ly: Layer | null = (raw as any).type ? raw as Layer : fromSanity(raw)
+      const ly: Layer | null = (raw as any).type ? (raw as Layer) : fromSanity(raw)
       if (!ly) continue
+
+      if (ly.leftPct != null) ly.x = (ly.leftPct / 100) * absW
+      if (ly.topPct  != null) ly.y = (ly.topPct  / 100) * absH
+      if (ly.widthPct  != null) ly.width  = (ly.widthPct  / 100) * absW
+      if (ly.heightPct != null) ly.height = (ly.heightPct / 100) * absH
 
 /* ---------- IMAGES --------------------------------------------- */
 if (ly.type === 'image' && (ly.src || ly.srcUrl)) {
@@ -718,10 +759,15 @@ if (ly.type === 'image' && (ly.src || ly.srcUrl)) {
 
           /* shared props */
           img.set({
-            left: ly.x, top: ly.y, originX: 'left', originY: 'top',
+            left      : ly.x,
+            top       : ly.y,
+            originX   : 'left',
+            originY   : 'top',
             selectable: ly.selectable ?? true,
-            evented: ly.editable ?? true,
-            opacity: ly.opacity ?? 1,
+            evented   : ly.editable ?? true,
+            opacity   : ly.opacity ?? 1,
+            flipX     : ly.flipX ?? false,
+            flipY     : ly.flipY ?? false,
           })
 
           /* ---------- AI placeholder extras -------------------------------- */
@@ -796,9 +842,7 @@ img.on('mouseup', () => {
 
           /* keep z-order */
           ;(img as any).layerIdx = idx
-          const pos = fc.getObjects().findIndex(o =>
-            (o as any).layerIdx !== undefined && (o as any).layerIdx < idx)
-          fc.insertAt(img, pos === -1 ? fc.getObjects().length : pos, false)
+          fc.insertAt(img, idx, false)
           img.setCoords()
           fc.requestRenderAll()
           document.dispatchEvent(
@@ -830,7 +874,7 @@ img.on('mouseup', () => {
           lockScalingFlip: true,
         })
         ;(tb as any).layerIdx = idx
-        fc.add(tb)
+        fc.insertAt(tb, idx, false)
       }
     }
 
