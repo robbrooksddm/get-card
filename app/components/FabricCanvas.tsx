@@ -8,13 +8,14 @@
  *********************************************************************/
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fabric }            from 'fabric'
 import { useEditor }         from './EditorStore'
 import { fromSanity }        from '@/app/library/layerAdapters'
 import '@/lib/fabricDefaults'
 import { SEL_COLOR } from '@/lib/fabricDefaults';
 import { CropTool } from '@/lib/CropTool'
+import ContextMenu from './ContextMenu'
 
 /* ---------- size helpers ---------------------------------------- */
 const DPI       = 300
@@ -33,6 +34,24 @@ const PAD  = 4 / SCALE;
 
 /** turn  gap (px) → a dashed-array scaled to canvas units */
 const dash = (gap: number) => [gap / SCALE, (gap - 2) / SCALE];
+
+/* ---------- shared clipboard helpers ------------------------------ */
+type Clip = { json: any[]; nudge: number };
+export const clip: Clip = { json: [], nudge: 0 };
+
+export const allObjs = (o: fabric.Object) =>
+  (o as any).type === 'activeSelection'
+    ? [(o as any), ...((o as any)._objects as fabric.Object[])]
+    : [o];
+
+export const PROPS = [
+  'src', 'srcUrl', 'assetId', '__src',
+  'text', 'fontSize', 'fontFamily', 'fill',
+  'fontWeight', 'fontStyle', 'underline',
+  'textAlign', 'lineHeight', 'opacity', 'lines',
+  'scaleX', 'scaleY', 'width', 'height',
+  'locked', 'selectable', 'left', 'top',
+];
 
 
 
@@ -360,10 +379,109 @@ export default function FabricCanvas ({ pageIdx, page, onReady, isCropping = fal
   const cropToolRef = useRef<CropTool | null>(null)
   const croppingRef = useRef(false)
 
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
+
 
 
   const setPageLayers = useEditor(s => s.setPageLayers)
   const updateLayer   = useEditor(s => s.updateLayer)
+
+  const handleMenuAction = (a: import('./ContextMenu').MenuAction) => {
+    const fc = fcRef.current
+    if (!fc) return
+    const active = fc.getActiveObject() as fabric.Object | undefined
+    switch (a) {
+      case 'add':
+        useEditor.getState().addText()
+        break
+      case 'cut':
+        if (active) {
+          clip.json = [active.toJSON(PROPS)]
+          clip.nudge = 0
+          allObjs(active).forEach(o => fc.remove(o))
+          syncLayersFromCanvas(fc, pageIdx)
+        }
+        break
+      case 'copy':
+        if (active) {
+          clip.json = [active.toJSON(PROPS)]
+          clip.nudge = 0
+        }
+        break
+      case 'paste':
+        if (clip.json.length) {
+          clip.nudge += 10
+          fabric.util.enlivenObjects(clip.json, objs => {
+            const root = objs[0]
+            root.set({ left: (root.left ?? 0) + clip.nudge, top: (root.top ?? 0) + clip.nudge })
+            root.setCoords()
+            if ((root as any).type === 'group') {
+              const g = root as fabric.Group
+              const kids = g._objects as fabric.Object[]
+              kids.forEach(o => fc.add(o))
+              fc.remove(g)
+              const sel = new fabric.ActiveSelection(kids, { canvas: fc } as any)
+              fc.setActiveObject(sel)
+            } else {
+              fc.add(root)
+              fc.setActiveObject(root)
+            }
+            fc.requestRenderAll()
+            syncLayersFromCanvas(fc, pageIdx)
+          }, '')
+        }
+        break
+      case 'duplicate':
+        if (active) {
+          clip.json = [active.toJSON(PROPS)]
+          clip.nudge += 10
+          fabric.util.enlivenObjects(clip.json, objs => {
+            const root = objs[0]
+            root.set({ left: (root.left ?? 0) + clip.nudge, top: (root.top ?? 0) + clip.nudge })
+            root.setCoords()
+            if ((root as any).type === 'group') {
+              const g = root as fabric.Group
+              const kids = g._objects as fabric.Object[]
+              kids.forEach(o => fc.add(o))
+              fc.remove(g)
+              const sel = new fabric.ActiveSelection(kids, { canvas: fc } as any)
+              fc.setActiveObject(sel)
+            } else {
+              fc.add(root)
+              fc.setActiveObject(root)
+            }
+            fc.requestRenderAll()
+            syncLayersFromCanvas(fc, pageIdx)
+          }, '')
+        }
+        break
+      case 'delete':
+        if (active) {
+          allObjs(active).forEach(o => fc.remove(o))
+          syncLayersFromCanvas(fc, pageIdx)
+        }
+        break
+      case 'crop':
+        document.dispatchEvent(new Event('start-crop'))
+        break
+      case 'lock':
+        if (active) {
+          const next = !(active as any).locked
+          ;(active as any).locked = next
+          active.set({
+            lockMovementX: next,
+            lockMovementY: next,
+            lockScalingX : next,
+            lockScalingY : next,
+            lockRotation : next,
+          })
+          fc.requestRenderAll()
+          updateLayer(pageIdx, (active as any).layerIdx, { locked: next })
+        }
+        break
+    }
+    setMenuPos(null)
+  }
 
 /* ---------- mount once --------------------------------------- */
 useEffect(() => {
@@ -375,6 +493,13 @@ useEffect(() => {
     backgroundColor       : '#fff',
     preserveObjectStacking: true,
   });
+
+  const ctxMenu = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenuPos({ x: e.clientX, y: e.clientY });
+  };
+  fc.upperCanvasEl.addEventListener('contextmenu', ctxMenu);
   /* --- keep Fabric’s wrapper the same size as the visible preview --- */
   const container = canvasRef.current!.parentElement as HTMLElement | null;
   if (container) {
@@ -547,26 +672,6 @@ addGuides(fc, mode)                           // add guides based on mode
 
 /* ───────────────── clipboard & keyboard shortcuts ────────────────── */
 
-/** Raw serialised objects we keep on the “clipboard” */
-type Clip = { json: any[]; nudge: number }
-const clip: Clip = { json: [], nudge: 0 }
-
-/** Small helper – return the wrapper itself (if any) and its children */
-const allObjs = (o: fabric.Object) =>
-  (o as any).type === 'activeSelection'
-    ? [(o as any), ...(o as any)._objects as fabric.Object[]]
-    : [o]
-
-/** Extra props we must keep when serialising */
-const PROPS = [
-  'src', 'srcUrl', 'assetId', '__src',               // images
-  'text', 'fontSize', 'fontFamily', 'fill',          // text
-  'fontWeight', 'fontStyle', 'underline',
-  'textAlign', 'lineHeight', 'opacity', 'lines',
-  'scaleX', 'scaleY', 'width', 'height',
-  'locked', 'selectable', 'left', 'top',
-]
-
 const onKey = (e: KeyboardEvent) => {
   const active = fc.getActiveObject() as fabric.Object | undefined
   const cmd    = e.metaKey || e.ctrlKey
@@ -671,6 +776,7 @@ window.addEventListener('keydown', onKey)
   fcRef.current = fc; onReady(fc)
 
     return () => {
+      fc.upperCanvasEl.removeEventListener('contextmenu', ctxMenu)
       window.removeEventListener('keydown', onKey)
       if (scrollHandler) window.removeEventListener('scroll', scrollHandler)
       window.removeEventListener('scroll', updateOffset)
@@ -889,12 +995,22 @@ img.on('mouseup', () => {
 
   /* ---------- render ----------------------------------------- */
   return (
-    <canvas
-      ref={canvasRef}
-      width={PREVIEW_W}
-      height={PREVIEW_H}
-      style={{ width: PREVIEW_W, height: PREVIEW_H }}   // lock CSS size
-      className="border shadow rounded"
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        width={PREVIEW_W}
+        height={PREVIEW_H}
+        style={{ width: PREVIEW_W, height: PREVIEW_H }}   // lock CSS size
+        className="border shadow rounded"
+      />
+      {menuPos && (
+        <ContextMenu
+          pos={menuPos}
+          locked={!!(fcRef.current?.getActiveObject() as any)?.locked}
+          onAction={handleMenuAction}
+          onClose={() => setMenuPos(null)}
+        />
+      )}
+    </>
   )
 }
