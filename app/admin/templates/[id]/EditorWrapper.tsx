@@ -44,6 +44,8 @@ export default function EditorWrapper({templateId, initialPages, printSpec}: Pro
     }
   }
 
+  console.log('[EditorWrapper] forwarding spec \u2192', printSpec)
+
   return (
     <>
       {error && (

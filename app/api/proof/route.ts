@@ -31,6 +31,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'bad input' }, { status: 400 })
     }
 
+    if (!Array.isArray(pageImages) || pageImages.length === 0 || !pageImages[0]) {
+      return NextResponse.json({ error: 'no images' }, { status: 400 })
+    }
+
     const spec = sku
       ? await sanityPreview.fetch<{
           trimWidthIn: number
@@ -57,9 +61,35 @@ export async function POST(req: NextRequest) {
 
     if (Array.isArray(pageImages) && typeof pageImages[0] === 'string' && pageImages[0]) {
       const m = pageImages[0].match(/^data:image\/\w+;base64,/)
-      const buf = Buffer.from(pageImages[0].replace(m ? m[0] : '', ''), 'base64')
+      let buf: Buffer
+      try {
+        buf = Buffer.from(pageImages[0].replace(m ? m[0] : '', ''), 'base64')
+      } catch {
+        return NextResponse.json({ error: 'no images' }, { status: 400 })
+      }
+      let meta
+      try {
+        meta = await sharp(buf).metadata()
+      } catch {
+        return NextResponse.json({ error: 'no images' }, { status: 400 })
+      }
+      if (!meta.format || meta.format === 'unknown') {
+        return NextResponse.json({ error: 'no images' }, { status: 400 })
+      }
+      const inputRatio = (meta.width || 1) / (meta.height || 1)
+      const targetRatio = width / height
+      if (Math.abs(inputRatio - targetRatio) / targetRatio > 0.01) {
+        console.error('bad ratio', inputRatio, 'vs', targetRatio)
+        return NextResponse.json({ error: 'ratio mismatch' }, { status: 400 })
+      }
+      if (
+        (meta.width || 0) < width * 0.75 ||
+        (meta.height || 0) < height * 0.75
+      ) {
+        console.error('image too small', meta.width, meta.height)
+        return NextResponse.json({ error: 'image too small' }, { status: 400 })
+      }
       img = sharp(buf).ensureAlpha()
-      const meta = await img.metadata()
       console.log('Fabric canvas px', meta.width, meta.height)
       console.log('Expected page px', width, height)
     } else {

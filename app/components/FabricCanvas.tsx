@@ -711,7 +711,10 @@ window.addEventListener('keydown', onKey)
       window.removeEventListener('keydown', keyCropHandler);
       onReady(null)
       cropToolRef.current?.abort()
-      fc.dispose()
+      if (!(fc as any).__disposed) {
+        (fc as any).__disposed = true
+        fc.dispose()
+      }
     }
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [])

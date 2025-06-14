@@ -34,6 +34,10 @@ const EMPTY: TemplatePage[] = [
   { name: 'back'   , layers: [] },
 ]
 
+/** Wait for the next animation frame */
+const nextFrame = () =>
+  new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+
 /* ---------- tiny coach-mark component ------------------------------ */
 function CoachMark({ anchor, onClose }: { anchor: DOMRect | null; onClose: () => void }) {
   if (!anchor) return null
@@ -71,12 +75,6 @@ export default function CardEditor({
   mode?: Mode
   onSave?: SaveFn
 }) {
-  if (printSpec) {
-    setPrintSpec(printSpec)
-    console.log('CardEditor received spec', printSpec)
-  } else {
-    console.warn('CardEditor missing printSpec')
-  }
   /* 1 ─ hydrate Zustand once ------------------------------------- */
   useEffect(() => {
     useEditor.getState().setPages(
@@ -110,14 +108,49 @@ export default function CardEditor({
     setCanvasMap(list => { const next = [...list]; next[idx] = fc; return next })
   const activeFc = canvasMap[activeIdx]
 
+  const prevSpec = useRef<PrintSpec | null>(null)
+
+  useEffect(() => {
+    if (!printSpec) {
+      console.warn('CardEditor missing printSpec')
+      return
+    }
+    if (prevSpec.current && JSON.stringify(prevSpec.current) === JSON.stringify(printSpec)) {
+      return
+    }
+    prevSpec.current = printSpec
+    setPrintSpec(printSpec)
+    console.log('CardEditor received spec', printSpec)
+    const SCALE = 420 / pageW()
+    canvasMap.forEach(fc => {
+      if (!fc) return
+      fc.setWidth(pageW())
+      fc.setHeight(pageH())
+      fc.setViewportTransform([SCALE, 0, 0, SCALE, 0, 0])
+      fc.requestRenderAll()
+    })
+  }, [printSpec, canvasMap])
+
   const [thumbs, setThumbs] = useState<string[]>(['', '', '', ''])
 
-  const updateThumbFromCanvas = (idx: number, fc: fabric.Canvas) => {
+  const updateThumbFromCanvas = async (idx: number, fc: fabric.Canvas) => {
     try {
       fc.renderAll()
-      console.log('Fabric canvas px', fc.getWidth(), fc.getHeight())
-      console.log('Expected page px', pageW(), pageH())
-      console.log('Export multiplier', EXPORT_MULT())
+      await nextFrame()
+      const previewW = (fc as any).lowerCanvasEl?.clientWidth || 0
+      const canvasW = fc.getWidth()
+      const mult = canvasW / previewW
+      console.log('thumb export', {
+        previewWidth: previewW,
+        canvasWidth: canvasW,
+        pageW: pageW(),
+        multiplier: mult,
+        expectedMult: EXPORT_MULT(),
+      })
+      if (!previewW || Math.abs(mult - EXPORT_MULT()) / EXPORT_MULT() > 0.05) {
+        console.warn('thumb multiplier off', mult)
+        return
+      }
       const url = fc.toDataURL({
         format: 'jpeg',
         quality: 0.8,
@@ -269,22 +302,36 @@ const handleSwap = (url: string) => {
 }
 
 /* generate images and show preview */
-const handlePreview = () => {
-  const imgs: string[] = []
-  canvasMap.forEach((fc, i) => {
-    if (!fc) return
-    const tool = (fc as any)._cropTool as CropTool | undefined
-    if (tool?.isActive) tool.commit()
-    fc.renderAll()
-    console.log('Fabric canvas px', fc.getWidth(), fc.getHeight())
-    console.log('Expected page px', pageW(), pageH())
-    console.log('Export multiplier', EXPORT_MULT())
-    imgs[i] = fc.toDataURL({
-      format: 'png',
-      quality: 1,
-      multiplier: EXPORT_MULT(),
+const handlePreview = async () => {
+  const imgs = await Promise.all(
+    canvasMap.map(async (fc, i) => {
+      if (!fc) return ''
+      const tool = (fc as any)._cropTool as CropTool | undefined
+      if (tool?.isActive) tool.commit()
+      fc.renderAll()
+      await nextFrame()
+      const previewW = (fc as any).lowerCanvasEl?.clientWidth || 0
+      const canvasW = fc.getWidth()
+      const mult = canvasW / previewW
+      console.log('preview export', {
+        previewWidth: previewW,
+        canvasWidth: canvasW,
+        pageW: pageW(),
+        multiplier: mult,
+        expectedMult: EXPORT_MULT(),
+      })
+      if (!previewW || Math.abs(mult - EXPORT_MULT()) / EXPORT_MULT() > 0.05) {
+        console.warn('preview multiplier off', mult)
+        return ''
+      }
+      console.log('outgoing preview', canvasW, fc.getHeight(), EXPORT_MULT())
+      return fc.toDataURL({
+        format: 'png',
+        quality: 1,
+        multiplier: EXPORT_MULT(),
+      })
     })
-  })
+  )
   setPreviewImgs(imgs)
   setPreviewOpen(true)
 }
@@ -300,17 +347,33 @@ const handleProof = async (sku: string) => {
     if (sync) sync()
   })
   const pages = useEditor.getState().pages
-  const pageImages: string[] = []
-  canvasMap.forEach(fc => {
-    if (!fc) { pageImages.push(''); return }
-    fc.renderAll()
-    console.log('Fabric canvas px', fc.getWidth(), fc.getHeight())
-    console.log('Expected page px', pageW(), pageH())
-    console.log('Export multiplier', EXPORT_MULT())
-    pageImages.push(
-      fc.toDataURL({ format: 'png', quality: 1, multiplier: EXPORT_MULT() })
-    )
-  })
+  const pageImages = await Promise.all(
+    canvasMap.map(async fc => {
+      if (!fc) return ''
+      fc.renderAll()
+      await nextFrame()
+      const previewW = (fc as any).lowerCanvasEl?.clientWidth || 0
+      const canvasW = fc.getWidth()
+      const mult = canvasW / previewW
+      console.log('proof export', {
+        previewWidth: previewW,
+        canvasWidth: canvasW,
+        pageW: pageW(),
+        multiplier: mult,
+        expectedMult: EXPORT_MULT(),
+      })
+      if (!previewW || Math.abs(mult - EXPORT_MULT()) / EXPORT_MULT() > 0.05) {
+        console.warn('proof multiplier off', mult)
+        return ''
+      }
+      console.log('outgoing', sku, canvasW, fc.getHeight(), EXPORT_MULT())
+      return fc.toDataURL({
+        format: 'png',
+        quality: 1,
+        multiplier: EXPORT_MULT(),
+      })
+    })
+  )
   try {
     const res = await fetch('/api/proof', {
       method : 'POST',
