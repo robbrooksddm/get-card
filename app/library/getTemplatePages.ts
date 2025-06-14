@@ -7,7 +7,7 @@
 import { sanityPreview } from '@/sanity/lib/client'
 import { urlFor } from '@/sanity/lib/image'
 import { fromSanity } from '@/app/library/layerAdapters'
-import type { TemplatePage, PrintSpec } from '@/app/components/FabricCanvas'
+import type { TemplatePage, PrintSpec, PreviewSpec } from '@/app/components/FabricCanvas'
 
 /* ---------- 4-page fallback so the editor always mounts --------- */
 const EMPTY: TemplatePage[] = [
@@ -21,6 +21,7 @@ export interface TemplateData {
   pages: TemplatePage[]
   coverImage?: string
   spec?: PrintSpec
+  previewSpec?: PreviewSpec
 }
 
 /**
@@ -42,7 +43,8 @@ export async function getTemplatePages(
     )
   ] | order(_updatedAt desc)[0]{
     coverImage,
-    "product": products[0]->{ printSpec },
+    previewSpec,
+    "product": products[0]->{ "printSpec": coalesce(printSpec->, printSpec) },
     pages[]{
       layers[]{
         ...,                       // keep every native field
@@ -62,7 +64,7 @@ export async function getTemplatePages(
     draftKey: idOrSlug.startsWith('drafts.') ? idOrSlug : `drafts.${idOrSlug}`,
   }
 
-  const raw = await sanityPreview.fetch<{pages?: any[]; coverImage?: any; product?: {printSpec?: PrintSpec}}>(query, params)
+  const raw = await sanityPreview.fetch<{pages?: any[]; coverImage?: any; previewSpec?: PreviewSpec; product?: {printSpec?: PrintSpec}}>(query, params)
 
   const pages = Array.isArray(raw?.pages) && raw.pages.length === 4
     ? raw.pages
@@ -77,7 +79,8 @@ console.log(
   '\n',
 );
 
-  const spec = raw?.product?.printSpec as PrintSpec | undefined
+  const spec = (raw?.product?.printSpec || undefined) as PrintSpec | undefined
+  const previewSpec = raw?.previewSpec as PreviewSpec | undefined
 
   const pagesOut = names.map((name, i) => ({
     name,
@@ -88,5 +91,5 @@ console.log(
 
   const coverImage = raw?.coverImage ? urlFor(raw.coverImage).url() : undefined
 
-  return { pages: pagesOut, coverImage, spec }
+  return { pages: pagesOut, coverImage, spec, previewSpec }
 }

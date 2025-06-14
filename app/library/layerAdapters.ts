@@ -17,10 +17,13 @@ const DEFAULT_SPEC: PrintSpec = {
   dpi         : 300,
 }
 
-const pageDims = (spec: PrintSpec = DEFAULT_SPEC) => ({
-  PAGE_W: Math.round((spec.trimWidthIn + spec.bleedIn * 2) * spec.dpi),
-  PAGE_H: Math.round((spec.trimHeightIn + spec.bleedIn * 2) * spec.dpi),
-})
+const pageDims = (spec?: PrintSpec | null) => {
+  const s = spec ?? DEFAULT_SPEC
+  return {
+    PAGE_W: Math.round((s.trimWidthIn + s.bleedIn * 2) * s.dpi),
+    PAGE_H: Math.round((s.trimHeightIn + s.bleedIn * 2) * s.dpi),
+  }
+}
 
 /* ───────── helpers ──────────────────────────────────────────────── */
 function isSanityRef(src:any): src is { _type:'image'; asset:{ _ref:string } } {

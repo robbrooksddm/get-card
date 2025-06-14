@@ -31,17 +31,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'bad input' }, { status: 400 })
     }
 
-    const spec = sku
+    const specRes = sku
       ? await sanityPreview.fetch<{
-          trimWidthIn: number
-          trimHeightIn: number
-          bleedIn: number
-          dpi: number
-        } | null>(
-          `*[_type=="cardProduct" && slug.current==$sku][0].printSpec`,
+          spec: {
+            trimWidthIn: number
+            trimHeightIn: number
+            bleedIn: number
+            dpi: number
+          } | null
+        }>(
+          `*[_type=="cardProduct" && slug.current==$sku][0]{"spec":coalesce(printSpec->, printSpec)}`,
           { sku },
         )
       : null
+    const spec = specRes?.spec ?? null
     const fallback = sku ? SPECS[sku as keyof typeof SPECS] : undefined
     const finalSpec = spec ?? fallback
     if (!finalSpec) {

@@ -120,6 +120,34 @@ export default defineType({
       validation: r => r.required(),
     }),
 
+    defineField({
+      name: 'previewSpec',
+      type: 'object',
+      title: 'Preview canvas',
+      group: 'basic',
+      fields: [
+        {
+          name: 'previewWidthPx',
+          type: 'number',
+          title: 'Width (px)',
+          initialValue: 420,
+          validation: r => r.required().positive(),
+        },
+        {
+          name: 'previewHeightPx',
+          type: 'number',
+          title: 'Height (px)',
+          initialValue: 580,
+          validation: r => r.required().positive(),
+        },
+        defineField({
+          name: 'maxMobileWidthPx',
+          type: 'number',
+          title: 'Max mobile width (px)',
+        }),
+      ],
+    }),
+
     /* —— Pages —————————————————————————— */
     defineField({
       name: 'pages',
@@ -229,13 +257,4 @@ export default defineType({
       of: [{type: 'reference', to: [{type: 'relation'}]}],
     }),
   ],
-
-  /* —— publish guard —————————————————— */
-  validation: Rule =>
-    Rule.custom((doc: any) => {
-      if (doc.isLive && (!doc.products || doc.products.length === 0)) {
-        return 'Cannot publish: add at least one product and keep “Visible in store?” ON'
-      }
-      return true
-    }),
 })

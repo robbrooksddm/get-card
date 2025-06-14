@@ -47,14 +47,17 @@ export default defineType({
     defineField({
       name: 'printSpec',
       title: 'Print specification',
-      type: 'printSpec',
+      type: 'reference',
+      to: [{ type: 'printSpec' }],
       validation: Rule => Rule.required(),
     }),
 
-    /* print specs – the editor can read these if you ever show guides
-       per product */
-    defineField({name:'trimWidthMm',  type:'number', title:'Trim width (mm)',  validation:(R)=>R.required()}),
-    defineField({name:'trimHeightMm', type:'number', title:'Trim height (mm)', validation:(R)=>R.required()}),
-    defineField({name:'pageCount',    type:'number', title:'Pages',            initialValue:4, validation:(R)=>R.required().integer().min(1).max(4)}),
+    defineField({
+      name: 'pageCount',
+      type: 'number',
+      title: 'Pages',
+      initialValue: 4,
+      validation: R => R.required().integer().min(1).max(4),
+    }),
   ],
 })

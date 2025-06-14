@@ -25,6 +25,12 @@ export interface PrintSpec {
   dpi: number
 }
 
+export interface PreviewSpec {
+  previewWidthPx: number
+  previewHeightPx: number
+  maxMobileWidthPx?: number
+}
+
 let currentSpec: PrintSpec = {
   trimWidthIn: 5,
   trimHeightIn: 7,
@@ -32,10 +38,16 @@ let currentSpec: PrintSpec = {
   dpi: 300,
 }
 
+let currentPreview: PreviewSpec = {
+  previewWidthPx: 420,
+  previewHeightPx: 580,
+}
+
 function recompute() {
   PAGE_W = Math.round((currentSpec.trimWidthIn + currentSpec.bleedIn * 2) * currentSpec.dpi)
   PAGE_H = Math.round((currentSpec.trimHeightIn + currentSpec.bleedIn * 2) * currentSpec.dpi)
-  PREVIEW_H = Math.round(PAGE_H * PREVIEW_W / PAGE_W)
+  PREVIEW_W = currentPreview.previewWidthPx
+  PREVIEW_H = currentPreview.previewHeightPx
   SCALE = PREVIEW_W / PAGE_W
   PAD = 4 / SCALE
 }
@@ -46,12 +58,17 @@ export const setPrintSpec = (spec: PrintSpec) => {
   recompute()
 }
 
+export const setPreviewSpec = (spec: PreviewSpec) => {
+  currentPreview = spec
+  recompute()
+}
+
 /* ---------- size helpers ---------------------------------------- */
-const PREVIEW_W = 420
+let PREVIEW_W = currentPreview.previewWidthPx
 
 let PAGE_W = 0
 let PAGE_H = 0
-let PREVIEW_H = 0
+let PREVIEW_H = currentPreview.previewHeightPx
 let SCALE = 1
 let PAD = 4
 
@@ -61,6 +78,8 @@ const mm = (n: number) => (n / 25.4) * currentSpec.dpi
 
 export const pageW = () => PAGE_W
 export const pageH = () => PAGE_H
+export const previewW = () => PREVIEW_W
+export const previewH = () => PREVIEW_H
 export const EXPORT_MULT = () => {
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
   return (1 / SCALE) / dpr
@@ -521,7 +540,7 @@ export default function FabricCanvas ({ pageIdx, page, onReady, isCropping = fal
 useEffect(() => {
   if (!canvasRef.current) return
 
-  // Create Fabric using the <canvas> element’s own dimensions (420 × ??)
+  // Create Fabric using the <canvas> element’s own dimensions
   // – we’ll work in full‑size page units and simply scale the viewport.
   const fc = new fabric.Canvas(canvasRef.current!, {
     backgroundColor       : '#fff',
@@ -543,7 +562,7 @@ useEffect(() => {
     container.style.maxHeight = `${PREVIEW_H}px`;
   }
   addBackdrop(fc);
-  // keep the preview scaled to 420 px wide
+  // keep the preview scaled to the configured width
   fc.setViewportTransform([SCALE, 0, 0, SCALE, 0, 0]);
 
   /* keep event coordinates aligned with any scroll/resize */

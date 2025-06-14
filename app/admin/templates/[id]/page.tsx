@@ -13,7 +13,7 @@ export const dynamic    = 'force-dynamic' // disable the route cache
 /* ---- imports ---------------------------------------------------- */
 import nextDynamic         from 'next/dynamic'   // ← renamed helper
 import {notFound}          from 'next/navigation'
-import {sanity}            from '@/sanity/lib/client'
+import {sanityPreview}     from '@/sanity/lib/client'
 import {getTemplatePages}  from '@/app/library/getTemplatePages'
 
 /* ---- page component -------------------------------------------- */
@@ -23,11 +23,11 @@ export default async function AdminTemplatePage({
   params: {id: string}
 }) {
   /* 1. fetch the *draft* template (404 if missing) */
-  const tpl = await sanity.fetch(
-    `*[_type=="cardTemplate" && _id==$id][0]{
+  const tpl = await sanityPreview.fetch(
+    `*[_type=="cardTemplate" && (_id==$id || _id==$draftId)][0]{
        _id,
        title,
-       "product": products[0]->{ printSpec },
+      "product": products[0]->{ "printSpec": coalesce(printSpec->, printSpec) },
        pages[]{
          _key,
          name,
@@ -37,12 +37,11 @@ export default async function AdminTemplatePage({
          }
        }
      }`,
-    { id }
+    { id, draftId: `drafts.${id}` }
   );
   if (!tpl) return notFound();
 
-  const { pages } = await getTemplatePages(id)
-  const spec = tpl.product?.printSpec
+  const { pages, spec, previewSpec } = await getTemplatePages(id)
   console.log('↳ template printSpec', spec)
 
   /* 2. load the client wrapper *only on the client* */
@@ -51,5 +50,12 @@ export default async function AdminTemplatePage({
     {ssr: false},
   )
 
-  return <EditorWrapper templateId={id} initialPages={pages} printSpec={spec} />
+  return (
+    <EditorWrapper
+      templateId={id}
+      initialPages={pages}
+      printSpec={spec}
+      previewSpec={previewSpec}
+    />
+  )
 }

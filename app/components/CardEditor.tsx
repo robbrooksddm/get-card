@@ -7,7 +7,17 @@ import { useEditor, setEditorSpec }     from './EditorStore'
 if (typeof window !== 'undefined') (window as any).useEditor = useEditor // debug helper
 
 import LayerPanel                       from './LayerPanel'
-import FabricCanvas, { pageW, pageH, EXPORT_MULT, setPrintSpec, PrintSpec } from './FabricCanvas'
+import FabricCanvas, {
+  pageW,
+  pageH,
+  EXPORT_MULT,
+  setPrintSpec,
+  setPreviewSpec,
+  PrintSpec,
+  PreviewSpec,
+  previewW,
+  previewH,
+} from './FabricCanvas'
 import TextToolbar                      from './TextToolbar'
 import ImageToolbar                     from './ImageToolbar'
 import EditorCommands                   from './EditorCommands'
@@ -62,12 +72,14 @@ export default function CardEditor({
   initialPages,
   templateId,
   printSpec,
+  previewSpec,
   mode = 'customer',
   onSave,
 }: {
   initialPages: TemplatePage[] | undefined
   templateId?: string
   printSpec?: PrintSpec
+  previewSpec?: PreviewSpec
   mode?: Mode
   onSave?: SaveFn
 }) {
@@ -77,6 +89,9 @@ export default function CardEditor({
     console.log('CardEditor received spec', printSpec)
   } else {
     console.warn('CardEditor missing printSpec')
+  }
+  if (previewSpec) {
+    setPreviewSpec(previewSpec)
   }
   /* 1 ─ hydrate Zustand once ------------------------------------- */
   useEffect(() => {
@@ -367,7 +382,8 @@ const handleProof = async (sku: string) => {
     )
   }
 
-  const box = 'flex-shrink-0 w-[420px]'
+  const boxWidth = previewW()
+  const box = `flex-shrink-0`
 
   /* ---------------- UI ------------------------------------------ */
   return (
@@ -439,7 +455,7 @@ const handleProof = async (sku: string) => {
                     {/* canvases */}
           <div className="flex-1 flex justify-center items-start overflow-auto bg-[--walty-cream] pt-6 gap-6">
             {/* front */}
-            <div className={section === 'front' ? box : 'hidden'}>
+            <div className={section === 'front' ? box : 'hidden'} style={{ width: boxWidth }}>
               <FabricCanvas
                 pageIdx={0}
                 page={pages[0]}
@@ -451,7 +467,7 @@ const handleProof = async (sku: string) => {
             </div>
             {/* inside */}
             <div className={section === 'inside' ? 'flex gap-6' : 'hidden'}>
-              <div className={box}>
+              <div className={box} style={{ width: boxWidth }}>
                 <FabricCanvas
                   pageIdx={1}
                   page={pages[1]}
@@ -461,7 +477,7 @@ const handleProof = async (sku: string) => {
                   mode={mode}
                 />
               </div>
-              <div className={box}>
+              <div className={box} style={{ width: boxWidth }}>
                 <FabricCanvas
                   pageIdx={2}
                   page={pages[2]}
@@ -473,7 +489,7 @@ const handleProof = async (sku: string) => {
               </div>
             </div>
             {/* back */}
-            <div className={section === 'back' ? box : 'hidden'}>
+            <div className={section === 'back' ? box : 'hidden'} style={{ width: boxWidth }}>
               <FabricCanvas
                 pageIdx={3}
                 page={pages[3]}

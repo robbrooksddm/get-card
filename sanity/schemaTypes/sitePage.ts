@@ -1,7 +1,7 @@
 import {defineArrayMember, defineField, defineType} from 'sanity'
 
 export default defineType({
-  name: 'page',
+  name: 'sitePage',
   type: 'document',
   title: 'Site page',
   fields: [
