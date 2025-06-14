@@ -554,9 +554,12 @@ useEffect(() => {
 
   /* ── Crop‑tool wiring ────────────────────────────────────── */
   // create a reusable crop helper and keep it in a ref
-  const crop = new CropTool(fc, SCALE, SEL_COLOR);
+  const crop = new CropTool(fc, SCALE, SEL_COLOR, state => {
+    croppingRef.current = state
+    onCroppingChange?.(state)
+  })
   cropToolRef.current = crop;
-  (fc as any)._cropTool = crop;
+  ;(fc as any)._cropTool = crop;
   (fc as any)._syncLayers = () => syncLayersFromCanvas(fc, pageIdx);
 
   // double‑click on an <image> starts cropping

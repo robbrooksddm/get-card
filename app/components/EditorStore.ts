@@ -51,6 +51,9 @@ interface EditorState {
   pages: TemplatePage[]
   activePage: number
 
+  /* ---- global crop mode ---- */
+  isCropMode: boolean
+
   /* ---- Selfie drawer ---- */
   drawerState: DrawerState
   drawerImages: string[]
@@ -71,6 +74,7 @@ interface EditorState {
   setDrawerState: (s: DrawerState) => void
   setDrawerImgs:  (a: string[]) => void
   setProgress:    (n: number) => void
+  setCropMode:    (b: boolean) => void
 
     /* new — FabricCanvas pushes a whole page’s layer list */
   setPageLayers: (page: number, layers: EditorLayer[]) => void
@@ -93,6 +97,9 @@ export const useEditor = create<EditorState>((set, get) => ({
   drawerState: 'idle',
   drawerImages: [],
   drawerProgress: 0,
+
+  /* ---- crop mode ---- */
+  isCropMode: false,
 
   /* ───── history ───── */
   history: [],
@@ -143,6 +150,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   setDrawerState: s   => set({ drawerState: s, drawerProgress: 0 }),
   setDrawerImgs : arr => set({ drawerImages: arr, choice: undefined }),
   setProgress   : n   => set({ drawerProgress: n }),
+  setCropMode   : b   => set({ isCropMode: b }),
 
     /* push whole layer arrays coming from FabricCanvas */
     setPageLayers : (pageIdx: number, layers: EditorLayer[]) =>
