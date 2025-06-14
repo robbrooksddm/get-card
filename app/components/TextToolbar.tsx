@@ -15,6 +15,7 @@ import IconButton              from './toolbar/IconButton'
 import { FontFamilySelect }    from './toolbar/FontFamilySelect'
 import { FontSizeStepper }     from './toolbar/FontSizeStepper'
 import ToolTextOpacitySlider   from './toolbar/ToolTextOpacitySlider'
+import ToolTextColorPicker     from './toolbar/ToolTextColorPicker'
 
 /* lucide-react icons */
 import {
@@ -31,7 +32,6 @@ import {
 } from './toolbar/AlignToPage'
 
 type Mode = 'staff' | 'customer'
-const fonts = ['Arial', 'Georgia', 'monospace', 'Dingos Stamp']
 
 interface Props {
   canvas   : fabric.Canvas | null
@@ -182,14 +182,8 @@ export default function TextToolbar (props: Props) {
             onChange={(v: number) => mutate({ fontSize: v })}
           />
 
-          {/* colour swatch */}
-          <input
-            disabled={!tb}
-            type="color"
-            value={tb ? (tb.fill as string) : '#000000'}
-            onChange={e => mutate({ fill: e.target.value })}
-            className="h-10 w-10 border rounded disabled:opacity-40"
-          />
+          {/* colour picker */}
+          <ToolTextColorPicker tb={tb} canvas={fc} mutate={mutate} />
 
           {/* centre on page */}
           <IconButton 
