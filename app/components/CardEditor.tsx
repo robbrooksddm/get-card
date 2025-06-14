@@ -7,7 +7,9 @@ import { useEditor }                    from './EditorStore'
 if (typeof window !== 'undefined') (window as any).useEditor = useEditor // debug helper
 
 import LayerPanel                       from './LayerPanel'
-import FabricCanvas                      from './FabricCanvas'
+import FabricCanvas, { pageW, pageH, EXPORT_MULT, setPrintSpec, applySpecToCanvas } from './FabricCanvas'
+import type { PrintSpec } from '@/lib/printSpecs'
+import { PRINT_SPECS } from '@/lib/printSpecs'
 import TextToolbar                      from './TextToolbar'
 import ImageToolbar                     from './ImageToolbar'
 import EditorCommands                   from './EditorCommands'
@@ -61,14 +63,26 @@ function CoachMark({ anchor, onClose }: { anchor: DOMRect | null; onClose: () =>
 export default function CardEditor({
   initialPages,
   templateId,
+  printSpec,
   mode = 'customer',
   onSave,
 }: {
   initialPages: TemplatePage[] | undefined
   templateId?: string
+  printSpec?: PrintSpec
   mode?: Mode
   onSave?: SaveFn
 }) {
+  const defaultSpec = printSpec || PRINT_SPECS['greeting-card-classic']
+  const [spec, setSpec] = useState<PrintSpec>(defaultSpec)
+  const [specKey, setSpecKey] = useState(0)
+
+  useEffect(() => {
+    setPrintSpec(spec)
+    console.log('CardEditor received spec', spec)
+    setSpecKey(k => k + 1)
+    canvasMap.forEach(fc => fc && applySpecToCanvas(fc))
+  }, [spec])
   /* 1 ─ hydrate Zustand once ------------------------------------- */
   useEffect(() => {
     useEditor.getState().setPages(
@@ -99,7 +113,12 @@ export default function CardEditor({
   const [canvasMap, setCanvasMap] =
     useState<(fabric.Canvas | null)[]>([null, null, null, null])
   const onReady = (idx: number, fc: fabric.Canvas | null) =>
-    setCanvasMap(list => { const next = [...list]; next[idx] = fc; return next })
+    setCanvasMap(list => {
+      if (fc) applySpecToCanvas(fc)
+      const next = [...list]
+      next[idx] = fc
+      return next
+    })
   const activeFc = canvasMap[activeIdx]
 
   const [thumbs, setThumbs] = useState<string[]>(['', '', '', ''])
@@ -107,7 +126,14 @@ export default function CardEditor({
   const updateThumbFromCanvas = (idx: number, fc: fabric.Canvas) => {
     try {
       fc.renderAll()
-      const url = fc.toDataURL({ format: 'jpeg', quality: 0.8 })
+      console.log('Fabric canvas px', fc.getWidth(), fc.getHeight())
+      console.log('Expected page px', pageW(), pageH())
+      console.log('Export multiplier', EXPORT_MULT())
+      const url = fc.toDataURL({
+        format: 'jpeg',
+        quality: 0.8,
+        multiplier: EXPORT_MULT(),
+      })
       setThumbs(prev => {
         const next = [...prev]
         next[idx] = url
@@ -187,7 +213,14 @@ export default function CardEditor({
       const fc = canvasMap[0]
       if (fc) {
         try {
-          const dataUrl = fc.toDataURL({ format: 'jpeg', quality: 0.8 })
+          console.log('Fabric canvas px', fc.getWidth(), fc.getHeight())
+          console.log('Expected page px', pageW(), pageH())
+          console.log('Export multiplier', EXPORT_MULT())
+          const dataUrl = fc.toDataURL({
+            format: 'jpeg',
+            quality: 0.8,
+            multiplier: EXPORT_MULT(),
+          })
           const res = await fetch(dataUrl)
           const blob = await res.blob()
           const form = new FormData()
@@ -254,7 +287,14 @@ const handlePreview = () => {
     const tool = (fc as any)._cropTool as CropTool | undefined
     if (tool?.isActive) tool.commit()
     fc.renderAll()
-    imgs[i] = fc.toDataURL({ format: 'png', quality: 1 })
+    console.log('Fabric canvas px', fc.getWidth(), fc.getHeight())
+    console.log('Expected page px', pageW(), pageH())
+    console.log('Export multiplier', EXPORT_MULT())
+    imgs[i] = fc.toDataURL({
+      format: 'png',
+      quality: 1,
+      multiplier: EXPORT_MULT(),
+    })
   })
   setPreviewImgs(imgs)
   setPreviewOpen(true)
@@ -262,6 +302,12 @@ const handlePreview = () => {
 
 /* download proof */
 const handleProof = async (sku: string) => {
+  const newSpec = PRINT_SPECS[sku as keyof typeof PRINT_SPECS]
+  if (newSpec) {
+    setPrintSpec(newSpec)
+    setSpec(newSpec)
+    canvasMap.forEach(fc => fc && applySpecToCanvas(fc))
+  }
   canvasMap.forEach(fc => {
     const tool = (fc as any)?._cropTool as CropTool | undefined
     if (tool?.isActive) tool.commit()
@@ -271,11 +317,22 @@ const handleProof = async (sku: string) => {
     if (sync) sync()
   })
   const pages = useEditor.getState().pages
+  const pageImages: string[] = []
+  canvasMap.forEach(fc => {
+    if (!fc) { pageImages.push(''); return }
+    fc.renderAll()
+    console.log('Fabric canvas px', fc.getWidth(), fc.getHeight())
+    console.log('Expected page px', pageW(), pageH())
+    console.log('Export multiplier', EXPORT_MULT())
+    pageImages.push(
+      fc.toDataURL({ format: 'png', quality: 1, multiplier: EXPORT_MULT() })
+    )
+  })
   try {
     const res = await fetch('/api/proof', {
       method : 'POST',
       headers: { 'content-type': 'application/json' },
-      body   : JSON.stringify({ pages, sku, id: templateId }),
+      body   : JSON.stringify({ pages, pageImages, sku, id: templateId }),
     })
     if (res.ok) {
       const blob = await res.blob()
@@ -400,6 +457,7 @@ const handleProof = async (sku: string) => {
             {/* front */}
             <div className={section === 'front' ? box : 'hidden'}>
               <FabricCanvas
+                key={`c-${specKey}-0`}
                 pageIdx={0}
                 page={pages[0]}
                 onReady={fc => onReady(0, fc)}
@@ -412,6 +470,7 @@ const handleProof = async (sku: string) => {
             <div className={section === 'inside' ? 'flex gap-6' : 'hidden'}>
               <div className={box}>
                 <FabricCanvas
+                  key={`c-${specKey}-1`}
                   pageIdx={1}
                   page={pages[1]}
                   onReady={fc => onReady(1, fc)}
@@ -422,6 +481,7 @@ const handleProof = async (sku: string) => {
               </div>
               <div className={box}>
                 <FabricCanvas
+                  key={`c-${specKey}-2`}
                   pageIdx={2}
                   page={pages[2]}
                   onReady={fc => onReady(2, fc)}
@@ -434,6 +494,7 @@ const handleProof = async (sku: string) => {
             {/* back */}
             <div className={section === 'back' ? box : 'hidden'}>
               <FabricCanvas
+                key={`c-${specKey}-3`}
                 pageIdx={3}
                 page={pages[3]}
                 onReady={fc => onReady(3, fc)}

@@ -27,7 +27,7 @@ export default async function AdminTemplatePage({
     `*[_type=="cardTemplate" && _id==$id][0]{
        _id,
        title,
-       product->{ printSpec },
+       "product": products[0]->{ printSpec },
        pages[]{
          _key,
          name,
@@ -42,6 +42,8 @@ export default async function AdminTemplatePage({
   if (!tpl) return notFound();
 
   const { pages } = await getTemplatePages(id)
+  const spec = tpl.product?.printSpec
+  console.log('↳ template printSpec', spec)
 
   /* 2. load the client wrapper *only on the client* */
   const EditorWrapper = nextDynamic(
@@ -49,5 +51,5 @@ export default async function AdminTemplatePage({
     {ssr: false},
   )
 
-  return <EditorWrapper templateId={id} initialPages={pages} />
+  return <EditorWrapper templateId={id} initialPages={pages} printSpec={spec} />
 }

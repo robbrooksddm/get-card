@@ -15,23 +15,74 @@ import { fromSanity }        from '@/app/library/layerAdapters'
 import '@/lib/fabricDefaults'
 import { SEL_COLOR } from '@/lib/fabricDefaults';
 import { CropTool } from '@/lib/CropTool'
+import type { PrintSpec } from '@/lib/printSpecs'
+
+const disposedCanvases = new WeakSet<fabric.Canvas>()
+export const safeDispose = (fc: fabric.Canvas | null) => {
+  if (!fc || disposedCanvases.has(fc)) return
+  disposedCanvases.add(fc)
+  // Avoid Fabric's built‑in dispose because it removes the canvas
+  // elements from the DOM. React already cleans them up on unmount
+  // which caused "NotFoundError: removeChild" when we double‑removed
+  // them. Clearing and removing listeners is enough here.
+  fc.off()
+  fc.clear()
+}
+
+/* ---------- print spec ----------------------------------------- */
+let currentSpec: PrintSpec = {
+  trimWidthIn: 5,
+  trimHeightIn: 7,
+  bleedIn: 0.125,
+  dpi: 300,
+}
+
+function recompute() {
+  PAGE_W = Math.round((currentSpec.trimWidthIn + currentSpec.bleedIn * 2) * currentSpec.dpi)
+  PAGE_H = Math.round((currentSpec.trimHeightIn + currentSpec.bleedIn * 2) * currentSpec.dpi)
+  PREVIEW_H = Math.round(PAGE_H * PREVIEW_W / PAGE_W)
+  SCALE = PREVIEW_W / PAGE_W
+  PAD = 4 / SCALE
+}
+
+export const setPrintSpec = (spec: PrintSpec) => {
+  console.log('FabricCanvas setSpec', spec.trimWidthIn, spec.trimHeightIn)
+  currentSpec = spec
+  recompute()
+}
+
+export const applySpecToCanvas = (fc: fabric.Canvas) => {
+  fc.setWidth(PAGE_W)
+  fc.setHeight(PAGE_H)
+  fc.setViewportTransform([SCALE, 0, 0, SCALE, 0, 0])
+  const container = fc.lowerCanvasEl.parentElement as HTMLElement | null
+  if (container) {
+    container.style.width = `${PREVIEW_W}px`
+    container.style.height = `${PREVIEW_H}px`
+    container.style.maxWidth = `${PREVIEW_W}px`
+    container.style.maxHeight = `${PREVIEW_H}px`
+  }
+  fc.requestRenderAll()
+}
 
 /* ---------- size helpers ---------------------------------------- */
-const DPI       = 300
-const mm        = (n: number) => (n / 25.4) * DPI
-const TRIM_W_MM = 150
-const TRIM_H_MM = 214
-const BLEED_MM  = 3
-const PAGE_W    = Math.round(mm(TRIM_W_MM + BLEED_MM * 2))
-const PAGE_H    = Math.round(mm(TRIM_H_MM + BLEED_MM * 2))
 const PREVIEW_W = 420
-const PREVIEW_H = Math.round(PAGE_H * PREVIEW_W / PAGE_W)
-const SCALE     = PREVIEW_W / PAGE_W
+
+let PAGE_W = 0
+let PAGE_H = 0
+let PREVIEW_H = 0
+let SCALE = 1
+let PAD = 4
+
+recompute()
+
+const mm = (n: number) => (n / 25.4) * currentSpec.dpi
+
+export const pageW = () => PAGE_W
+export const pageH = () => PAGE_H
+export const EXPORT_MULT = () => 1 / SCALE
 
 // 4 CSS-px padding used by the hover outline
-const PAD  = 4 / SCALE;
-
-/** turn  gap (px) → a dashed-array scaled to canvas units */
 const dash = (gap: number) => [gap / SCALE, (gap - 2) / SCALE];
 
 
@@ -308,7 +359,7 @@ const addGuides = (fc: fabric.Canvas, mode: Mode) => {
   ].forEach(l => fc.add(l))
 
   if (mode === 'staff') {
-    const bleed = mm(BLEED_MM)
+    const bleed = mm(currentSpec.bleedIn * 25.4)
     ;[
       mk([bleed, bleed, PAGE_W - bleed, bleed], 'bleed', '#f87171'),
       mk([PAGE_W - bleed, bleed, PAGE_W - bleed, PAGE_H - bleed], 'bleed', '#f87171'),
@@ -670,17 +721,21 @@ window.addEventListener('keydown', onKey)
   ;(fc as any)._editingRef = isEditing
   fcRef.current = fc; onReady(fc)
 
+    const disposed = { current: false }
     return () => {
+      if (disposed.current) return
+      disposed.current = true
       window.removeEventListener('keydown', onKey)
       if (scrollHandler) window.removeEventListener('scroll', scrollHandler)
       window.removeEventListener('scroll', updateOffset)
       window.removeEventListener('resize', updateOffset)
       // tidy up crop‑tool listeners
-      fc.off('mouse:dblclick', dblHandler);
-      window.removeEventListener('keydown', keyCropHandler);
+      fc.off('mouse:dblclick', dblHandler)
+      window.removeEventListener('keydown', keyCropHandler)
       onReady(null)
       cropToolRef.current?.abort()
-      fc.dispose()
+      safeDispose(fc)
+      fcRef.current = null
     }
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [])

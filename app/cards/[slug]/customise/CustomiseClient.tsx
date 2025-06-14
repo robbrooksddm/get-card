@@ -15,5 +15,5 @@
      }
    
      // 3️⃣ use customer mode so shoppers get the streamlined editor
-     return <CardEditor initialPages={tpl.pages} mode="customer" />;
+     return <CardEditor initialPages={tpl.pages} printSpec={tpl.spec} mode="customer" />;
    }

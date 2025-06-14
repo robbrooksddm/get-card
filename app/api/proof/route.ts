@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import sharp from 'sharp'
 import { sanityPreview } from '@/sanity/lib/client'
+import { PRINT_SPECS, PrintSpec } from '@/lib/printSpecs'
 
 interface Overlay extends sharp.OverlayOptions {
   /** Global opacity for the overlay; sharp's types omit this */
@@ -9,11 +10,7 @@ interface Overlay extends sharp.OverlayOptions {
 
 export const dynamic = 'force-dynamic'
 
-const SPECS = {
-  'greeting-card-giant'  : { trimWidthIn: 9, trimHeightIn: 11.6667, bleedIn: 0.125, dpi: 300 },
-  'greeting-card-classic': { trimWidthIn: 5, trimHeightIn: 7, bleedIn: 0.125, dpi: 300 },
-  'greeting-card-mini'   : { trimWidthIn: 4, trimHeightIn: 6, bleedIn: 0.125, dpi: 300 },
-} as const
+
 
 function esc(s: string) {
   return s.replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]!))
@@ -21,27 +18,31 @@ function esc(s: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { pages, id, sku } = (await req.json()) as {
+    const { pages, pageImages, id, sku } = (await req.json()) as {
       pages: any[]
+      pageImages?: string[]
       id: string
       sku?: string
     }
-    if (!Array.isArray(pages) || typeof id !== 'string') {
+    if (typeof id !== 'string') {
       return NextResponse.json({ error: 'bad input' }, { status: 400 })
+    }
+    if (
+      !Array.isArray(pageImages) ||
+      pageImages.length === 0 ||
+      typeof pageImages[0] !== 'string' ||
+      !/^data:image\//i.test(pageImages[0])
+    ) {
+      return NextResponse.json({ error: 'missing page images' }, { status: 400 })
     }
 
     const spec = sku
-      ? await sanityPreview.fetch<{
-          trimWidthIn: number
-          trimHeightIn: number
-          bleedIn: number
-          dpi: number
-        } | null>(
+      ? await sanityPreview.fetch<PrintSpec | null>(
           `*[_type=="cardProduct" && slug.current==$sku][0].printSpec`,
           { sku },
         )
       : null
-    const fallback = sku ? SPECS[sku as keyof typeof SPECS] : undefined
+    const fallback = sku ? PRINT_SPECS[sku as keyof typeof PRINT_SPECS] : undefined
     const finalSpec = spec ?? fallback
     if (!finalSpec) {
       return NextResponse.json({ error: 'spec not found' }, { status: 404 })
@@ -52,12 +53,25 @@ export async function POST(req: NextRequest) {
     const height = px(finalSpec.trimHeightIn + finalSpec.bleedIn * 2)
 
     const clamp = (n:number, min:number, max:number) => Math.max(min, Math.min(max, n))
-    const composites: Overlay[] = []
-    const page = pages[0] || {}
-    const layers = Array.isArray(page.layers) ? page.layers : []
+    let img: sharp.Sharp
 
-    for (const ly of layers) {
-      let x = ly.leftPct != null ? (ly.leftPct / 100) * width  : ly.x
+    if (Array.isArray(pageImages) && typeof pageImages[0] === 'string' && pageImages[0]) {
+      const m = pageImages[0].match(/^data:image\/\w+;base64,/)
+      const buf = Buffer.from(pageImages[0].replace(m ? m[0] : '', ''), 'base64')
+      img = sharp(buf).ensureAlpha()
+      const meta = await img.metadata()
+      console.log('Fabric canvas px', meta.width, meta.height)
+      console.log('Expected page px', width, height)
+      if (meta.width !== width || meta.height !== height) {
+        return NextResponse.json({ error: 'size mismatch' }, { status: 400 })
+      }
+    } else {
+      const composites: Overlay[] = []
+      const page = pages[0] || {}
+      const layers = Array.isArray(page.layers) ? page.layers : []
+
+      for (const ly of layers) {
+        let x = ly.leftPct != null ? (ly.leftPct / 100) * width  : ly.x
       let y = ly.topPct  != null ? (ly.topPct  / 100) * height : ly.y
       let w = ly.widthPct  != null ? (ly.widthPct  / 100) * width  : ly.width
       let h = ly.heightPct != null ? (ly.heightPct / 100) * height : ly.height
@@ -74,6 +88,9 @@ export async function POST(req: NextRequest) {
           const res = await fetch(url)
           const buf = Buffer.from(await res.arrayBuffer())
           let imgSharp = sharp(buf).ensureAlpha()
+          const meta = await imgSharp.metadata()
+          console.log('Fabric canvas px', meta.width, meta.height)
+          console.log('Expected page px', width, height)
           if (ly.cropW != null && ly.cropH != null) {
             const left = Math.max(0, Math.round(ly.cropX ?? 0))
             const top = Math.max(0, Math.round(ly.cropY ?? 0))
@@ -109,19 +126,30 @@ export async function POST(req: NextRequest) {
           `</svg>`
         composites.push({ input: Buffer.from(svg), left: x, top: y, opacity: ly.opacity ?? 1 } as Overlay)
       }
+      }
+
+      img = sharp({ create: { width, height, channels: 4, background: '#ffffff' } }).composite(composites)
     }
 
-    let img = sharp({ create: { width, height, channels: 4, background: '#ffffff' } }).composite(composites)
+    const bleedW = finalSpec.trimWidthIn + finalSpec.bleedIn * 2
+    const bleedH = finalSpec.trimHeightIn + finalSpec.bleedIn * 2
 
     const masterRatio = width / height
-    const targetRatio =
-      (finalSpec.trimWidthIn + finalSpec.bleedIn * 2) /
-      (finalSpec.trimHeightIn + finalSpec.bleedIn * 2)
-    if (targetRatio < masterRatio) {
+    const targetRatio = bleedW / bleedH
+
+    if (targetRatio < masterRatio - 0.0001) {
       const cropW = Math.round(height * targetRatio)
       const offsetX = Math.floor((width - cropW) / 2)
-      img = img.extract({ left: offsetX, top: 0, width: cropW, height })
-               .extend({ left: 0, right: 0, top: 0, bottom: 0, background: '#ffffff' })
+
+      img = img
+        .extract({ left: offsetX, top: 0, width: cropW, height })
+        .extend({
+          left: Math.round(finalSpec.bleedIn * finalSpec.dpi),
+          right: Math.round(finalSpec.bleedIn * finalSpec.dpi),
+          top: 0,
+          bottom: 0,
+          background: '#ffffff',
+        })
     }
 
     const out = await img
