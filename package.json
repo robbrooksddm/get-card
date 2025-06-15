@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "next lint",
     "purge:assets": "tsx ./scripts/purge-assets.ts",
-    "purge:once": "tsx scripts/purgeTempAssets.ts"
+    "purge:once": "tsx scripts/purgeTempAssets.ts",
+    "migrate:printSpecs": "tsx scripts/migratePrintSpecs.ts"
   },
   "dependencies": {
     "@headlessui/react": "2.2.2",

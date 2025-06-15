@@ -4,8 +4,9 @@
 
 import cardTemplate  from './cardTemplate'
 import cardProduct   from './cardProduct'
+import product       from './product'
 import productMockup from './productMockup'
-import page          from './page'
+import sitePage      from './sitePage'
 
 /* AI-related ---------------------------------------------------- */
 import aiPlaceholder from './aiPlaceholder'
@@ -27,17 +28,18 @@ import relation from './relation'   // ← RE-ADDED ✔
 export const schemaTypes = [
   /* documents */
   cardTemplate,
+  product,
   cardProduct,
   productMockup,
-  page,
+  sitePage,
   aiPlaceholder,
+  printSpec,
 
   /* objects */
   aiLayer,
   editableImage,
   editableText,
   heroSection,
-  printSpec,
 
   /* facets */
   occasion,

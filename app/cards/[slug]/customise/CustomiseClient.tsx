@@ -12,8 +12,16 @@
      // 2️⃣ NEW: put them on window so we can inspect in DevTools
      if (typeof window !== "undefined") {
        (window as any).tplPages = tpl.pages;
+       (window as any).tplPreview = tpl.previewSpec;
      }
    
      // 3️⃣ use customer mode so shoppers get the streamlined editor
-     return <CardEditor initialPages={tpl.pages} printSpec={tpl.spec} mode="customer" />;
+     return (
+       <CardEditor
+         initialPages={tpl.pages}
+         printSpec={tpl.spec}
+         previewSpec={tpl.previewSpec}
+         mode="customer"
+       />
+     );
    }

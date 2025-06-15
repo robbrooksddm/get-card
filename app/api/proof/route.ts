@@ -21,27 +21,31 @@ function esc(s: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { pages, pageImages, id, sku } = (await req.json()) as {
+    const { pages, pageImages, id, sku, filename } = (await req.json()) as {
       pages: any[]
       pageImages?: string[]
       id: string
       sku?: string
+      filename?: string
     }
     if ((!Array.isArray(pages) && !Array.isArray(pageImages)) || typeof id !== 'string') {
       return NextResponse.json({ error: 'bad input' }, { status: 400 })
     }
 
-    const spec = sku
+    const specRes = sku
       ? await sanityPreview.fetch<{
-          trimWidthIn: number
-          trimHeightIn: number
-          bleedIn: number
-          dpi: number
-        } | null>(
-          `*[_type=="cardProduct" && slug.current==$sku][0].printSpec`,
+          spec: {
+            trimWidthIn: number
+            trimHeightIn: number
+            bleedIn: number
+            dpi: number
+          } | null
+        }>(
+          `*[_type=="cardProduct" && slug.current==$sku][0]{"spec":coalesce(printSpec->, printSpec)}`,
           { sku },
         )
       : null
+    const spec = specRes?.spec ?? null
     const fallback = sku ? SPECS[sku as keyof typeof SPECS] : undefined
     const finalSpec = spec ?? fallback
     if (!finalSpec) {
@@ -155,7 +159,13 @@ export async function POST(req: NextRequest) {
     const out = await img
       .jpeg({ quality: 95, chromaSubsampling: '4:4:4' })
       .toBuffer()
-    return new NextResponse(out, { headers: { 'content-type': 'image/jpeg' } })
+    const name = filename && typeof filename === 'string' ? filename : 'proof.jpg'
+    return new NextResponse(out, {
+      headers: {
+        'content-type': 'image/jpeg',
+        'content-disposition': `attachment; filename="${name}"`,
+      },
+    })
   } catch (err) {
     console.error('[proof]', err)
     return NextResponse.json({ error: 'server' }, { status: 500 })

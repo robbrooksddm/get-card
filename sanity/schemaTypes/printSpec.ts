@@ -2,7 +2,7 @@ import {defineType, defineField} from 'sanity'
 
 export default defineType({
   name: 'printSpec',
-  type: 'object',
+  type: 'document',
   title: 'Print specification',
   fields: [
     defineField({

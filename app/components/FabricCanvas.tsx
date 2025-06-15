@@ -25,6 +25,12 @@ export interface PrintSpec {
   dpi: number
 }
 
+export interface PreviewSpec {
+  previewWidthPx: number
+  previewHeightPx: number
+  maxMobileWidthPx?: number
+}
+
 let currentSpec: PrintSpec = {
   trimWidthIn: 5,
   trimHeightIn: 7,
@@ -32,12 +38,28 @@ let currentSpec: PrintSpec = {
   dpi: 300,
 }
 
+let currentPreview: PreviewSpec = {
+  previewWidthPx: 420,
+  previewHeightPx: 580,
+}
+
+let safeInsetXIn = 0
+let safeInsetYIn = 0
+let SAFE_X = 0
+let SAFE_Y = 0
+
 function recompute() {
   PAGE_W = Math.round((currentSpec.trimWidthIn + currentSpec.bleedIn * 2) * currentSpec.dpi)
   PAGE_H = Math.round((currentSpec.trimHeightIn + currentSpec.bleedIn * 2) * currentSpec.dpi)
-  PREVIEW_H = Math.round(PAGE_H * PREVIEW_W / PAGE_W)
+  PREVIEW_W = currentPreview.previewWidthPx
+  PREVIEW_H = currentPreview.previewHeightPx
   SCALE = PREVIEW_W / PAGE_W
   PAD = 4 / SCALE
+  // compute safe-zone after scaling so rounding happens in preview pixels
+  const safeXPreview = safeInsetXIn * currentSpec.dpi * SCALE
+  const safeYPreview = safeInsetYIn * currentSpec.dpi * SCALE
+  SAFE_X = Math.round(safeXPreview) / SCALE
+  SAFE_Y = Math.round(safeYPreview) / SCALE
 }
 
 export const setPrintSpec = (spec: PrintSpec) => {
@@ -46,12 +68,23 @@ export const setPrintSpec = (spec: PrintSpec) => {
   recompute()
 }
 
+export const setSafeInset = (xIn: number, yIn: number) => {
+  safeInsetXIn = xIn
+  safeInsetYIn = yIn
+  recompute()
+}
+
+export const setPreviewSpec = (spec: PreviewSpec) => {
+  currentPreview = spec
+  recompute()
+}
+
 /* ---------- size helpers ---------------------------------------- */
-const PREVIEW_W = 420
+let PREVIEW_W = currentPreview.previewWidthPx
 
 let PAGE_W = 0
 let PAGE_H = 0
-let PREVIEW_H = 0
+let PREVIEW_H = currentPreview.previewHeightPx
 let SCALE = 1
 let PAD = 4
 
@@ -61,6 +94,8 @@ const mm = (n: number) => (n / 25.4) * currentSpec.dpi
 
 export const pageW = () => PAGE_W
 export const pageH = () => PAGE_H
+export const previewW = () => PREVIEW_W
+export const previewH = () => PREVIEW_H
 export const EXPORT_MULT = () => {
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
   return (1 / SCALE) / dpr
@@ -350,15 +385,16 @@ const addGuides = (fc: fabric.Canvas, mode: Mode) => {
       { _guide: name },
     )
 
-  /* responsive safe-zone */
-  const safeX = PAGE_W * 0.1
-  const safeY = PAGE_H * 0.05
-  ;[
-    mk([safeX, safeY, PAGE_W - safeX, safeY], 'safe-zone', '#34d399'),
-    mk([PAGE_W - safeX, safeY, PAGE_W - safeX, PAGE_H - safeY], 'safe-zone', '#34d399'),
-    mk([PAGE_W - safeX, PAGE_H - safeY, safeX, PAGE_H - safeY], 'safe-zone', '#34d399'),
-    mk([safeX, PAGE_H - safeY, safeX, safeY], 'safe-zone', '#34d399'),
-  ].forEach(l => fc.add(l))
+  if (SAFE_X > 0 || SAFE_Y > 0) {
+    const safeX = SAFE_X
+    const safeY = SAFE_Y
+    ;[
+      mk([safeX, safeY, PAGE_W - safeX, safeY], 'safe-zone', '#34d399'),
+      mk([PAGE_W - safeX, safeY, PAGE_W - safeX, PAGE_H - safeY], 'safe-zone', '#34d399'),
+      mk([PAGE_W - safeX, PAGE_H - safeY, safeX, PAGE_H - safeY], 'safe-zone', '#34d399'),
+      mk([safeX, PAGE_H - safeY, safeX, safeY], 'safe-zone', '#34d399'),
+    ].forEach(l => fc.add(l))
+  }
 
   if (mode === 'staff') {
     const bleed = mm(currentSpec.bleedIn * 25.4)
@@ -521,7 +557,7 @@ export default function FabricCanvas ({ pageIdx, page, onReady, isCropping = fal
 useEffect(() => {
   if (!canvasRef.current) return
 
-  // Create Fabric using the <canvas> element’s own dimensions (420 × ??)
+  // Create Fabric using the <canvas> element’s own dimensions
   // – we’ll work in full‑size page units and simply scale the viewport.
   const fc = new fabric.Canvas(canvasRef.current!, {
     backgroundColor       : '#fff',
@@ -543,7 +579,7 @@ useEffect(() => {
     container.style.maxHeight = `${PREVIEW_H}px`;
   }
   addBackdrop(fc);
-  // keep the preview scaled to 420 px wide
+  // keep the preview scaled to the configured width
   fc.setViewportTransform([SCALE, 0, 0, SCALE, 0, 0]);
 
   /* keep event coordinates aligned with any scroll/resize */
@@ -554,9 +590,12 @@ useEffect(() => {
 
   /* ── Crop‑tool wiring ────────────────────────────────────── */
   // create a reusable crop helper and keep it in a ref
-  const crop = new CropTool(fc, SCALE, SEL_COLOR);
+  const crop = new CropTool(fc, SCALE, SEL_COLOR, state => {
+    croppingRef.current = state
+    onCroppingChange?.(state)
+  })
   cropToolRef.current = crop;
-  (fc as any)._cropTool = crop;
+  ;(fc as any)._cropTool = crop;
   (fc as any)._syncLayers = () => syncLayersFromCanvas(fc, pageIdx);
 
   // double‑click on an <image> starts cropping

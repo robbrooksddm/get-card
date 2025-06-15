@@ -14,6 +14,7 @@ export class CropTool {
   private fc      : fabric.Canvas
   private SCALE   : number
   private SEL     : string
+  private onChange?: (state: boolean) => void
   private img     : fabric.Image | null = null
   private frame   : fabric.Group | null = null
   private masks   : fabric.Rect[] = [];      // 4‑piece dim overlay
@@ -23,10 +24,12 @@ export class CropTool {
   /** clean‑up callbacks to run on `teardown()` */
   private cleanup: Array<() => void> = [];
 
-  constructor (fc: fabric.Canvas, scale: number, selColour: string) {
-    this.fc    = fc
-    this.SCALE = scale
-    this.SEL   = selColour
+  constructor (fc: fabric.Canvas, scale: number, selColour: string,
+               onChange?: (state: boolean) => void) {
+    this.fc      = fc
+    this.SCALE   = scale
+    this.SEL     = selColour
+    this.onChange= onChange
   }
 
   /* ─────────────── public API ──────────────────────────────────── */
@@ -38,6 +41,7 @@ export class CropTool {
     this.cleanup = [];
 
     this.isActive = true
+    this.onChange?.(true)
     this.img      = img
     // allow freeform scaling of the crop window
     const prevUniformScaling = this.fc.uniformScaling
@@ -741,6 +745,7 @@ export class CropTool {
     this.img      = null
     this.orig     = null
     this.isActive = false
+    this.onChange?.(false)
   }
 
   /* keep bitmap inside frame */

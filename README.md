@@ -45,3 +45,6 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 ⚠️  **Image crop is partially implemented – stable build, but crop needs fixes.**
+
+## CMS-driven preview
+Templates store a `previewSpec` and linked product variants. The editor reads this data so every template opens with the correct canvas size and safe-area guides.
