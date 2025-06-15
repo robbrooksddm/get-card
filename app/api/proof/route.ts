@@ -10,9 +10,27 @@ interface Overlay extends sharp.OverlayOptions {
 export const dynamic = 'force-dynamic'
 
 const SPECS = {
-  'greeting-card-giant'  : { trimWidthIn: 9, trimHeightIn: 11.6667, bleedIn: 0.125, dpi: 300 },
-  'greeting-card-classic': { trimWidthIn: 5, trimHeightIn: 7, bleedIn: 0.125, dpi: 300 },
-  'greeting-card-mini'   : { trimWidthIn: 4, trimHeightIn: 6, bleedIn: 0.125, dpi: 300 },
+  'greeting-card-giant': {
+    trimWidthIn: 9,
+    trimHeightIn: 11.6667,
+    bleedIn: 0.125,
+    dpi: 300,
+    spreadLayout: { artboardWidthPx: 8031, artboardHeightPx: 2854 },
+  },
+  'greeting-card-classic': {
+    trimWidthIn: 5,
+    trimHeightIn: 7,
+    bleedIn: 0.125,
+    dpi: 300,
+    spreadLayout: { artboardWidthPx: 6117, artboardHeightPx: 2161 },
+  },
+  'greeting-card-mini': {
+    trimWidthIn: 4,
+    trimHeightIn: 6,
+    bleedIn: 0.125,
+    dpi: 300,
+    spreadLayout: { artboardWidthPx: 4936, artboardHeightPx: 1854 },
+  },
 } as const
 
 function esc(s: string) {
@@ -39,6 +57,10 @@ export async function POST(req: NextRequest) {
             trimHeightIn: number
             bleedIn: number
             dpi: number
+            spreadLayout?: {
+              artboardWidthPx: number
+              artboardHeightPx: number
+            }
           } | null
         }>(
           `*[_type=="cardProduct" && slug.current==$sku][0]{"spec":coalesce(printSpec->, printSpec)}`,
@@ -52,9 +74,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'spec not found' }, { status: 404 })
     }
 
-    const px = (inches: number) => Math.round(inches * finalSpec.dpi)
-    const width  = px(finalSpec.trimWidthIn  + finalSpec.bleedIn * 2)
-    const height = px(finalSpec.trimHeightIn + finalSpec.bleedIn * 2)
+    const layout = finalSpec.spreadLayout
+    if (!layout?.artboardWidthPx || !layout.artboardHeightPx) {
+      return NextResponse.json({ error: 'missing artboard size' }, { status: 500 })
+    }
+    const width = layout.artboardWidthPx
+    const height = layout.artboardHeightPx
 
     const clamp = (n:number, min:number, max:number) => Math.max(min, Math.min(max, n))
     let img: sharp.Sharp

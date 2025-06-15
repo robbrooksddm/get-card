@@ -18,6 +18,35 @@ async function run() {
     trimHeightMm?: number
   }[]>(`*[_type=="cardProduct"]{_id, printSpec, trimWidthMm, trimHeightMm}`)
 
+  const specs = await sanity.fetch<{
+    _id: string
+    dpi: number
+    spreadLayout?: {
+      artboardWidthIn?: number
+      artboardHeightIn?: number
+    }
+  }[]>(`*[_type=="printSpec"]{_id, dpi, spreadLayout}`)
+
+  for (const s of specs) {
+    const sl = s.spreadLayout
+    if (sl && sl.artboardWidthIn && sl.artboardHeightIn) {
+      const widthPx = Math.ceil(sl.artboardWidthIn * s.dpi)
+      const heightPx = Math.ceil(sl.artboardHeightIn * s.dpi)
+      await sanity
+        .patch(s._id)
+        .set({
+          'spreadLayout.artboardWidthPx': widthPx,
+          'spreadLayout.artboardHeightPx': heightPx,
+        })
+        .unset([
+          'spreadLayout.artboardWidthIn',
+          'spreadLayout.artboardHeightIn',
+        ])
+        .commit()
+      console.log(`✔ migrated spec ${s._id}`)
+    }
+  }
+
   for (const p of products) {
     if (p.printSpec?._ref) continue
     const spec = p.printSpec ?? (p.trimWidthMm && p.trimHeightMm ? {

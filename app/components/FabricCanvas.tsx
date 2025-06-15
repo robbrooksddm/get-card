@@ -24,6 +24,10 @@ export interface PrintSpec {
   trimHeightIn: number
   bleedIn: number
   dpi: number
+  spreadLayout?: {
+    artboardWidthPx: number
+    artboardHeightPx: number
+  }
 }
 
 export interface PreviewSpec {

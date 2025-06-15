@@ -31,6 +31,25 @@ export default defineType({
       initialValue: 300,
       validation: r => r.required().min(72),
     }),
+    defineField({
+      name: 'spreadLayout',
+      type: 'object',
+      title: 'Spread layout',
+      fields: [
+        {
+          name: 'artboardWidthPx',
+          type: 'number',
+          title: 'Artboard width (px)',
+          validation: r => r.required().positive(),
+        },
+        {
+          name: 'artboardHeightPx',
+          type: 'number',
+          title: 'Artboard height (px)',
+          validation: r => r.required().positive(),
+        },
+      ],
+    }),
   ],
   preview: {
     select: {
